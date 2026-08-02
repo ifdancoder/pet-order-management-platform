@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Layer\Identity\Infrastructure\Persistence\Eloquent\Model;
+namespace src\Layer\Identity\Infrastructure\Persistence\Eloquent\Model;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;

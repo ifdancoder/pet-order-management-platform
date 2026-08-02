@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Layer\Identity\Domain\Exception;
+namespace src\Layer\Identity\Domain\Exception;
 
 use DomainException;
 

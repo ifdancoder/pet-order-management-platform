@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace App\Layer\Identity\Infrastructure\Persistence\Eloquent\Mapper;
+namespace src\Layer\Identity\Infrastructure\Persistence\Eloquent\Mapper;
 
-use App\Layer\Identity\Domain\Entity\User;
-use App\Layer\Identity\Domain\Enum\UserStatus;
-use App\Layer\Identity\Domain\ValueObject\Email;
-use App\Layer\Identity\Domain\ValueObject\PasswordHash;
-use App\Layer\Identity\Domain\ValueObject\UserId;
-use App\Layer\Identity\Infrastructure\Persistence\Eloquent\Model\UserModel;
+use src\Layer\Identity\Domain\Entity\User;
+use src\Layer\Identity\Domain\Enum\UserStatus;
+use src\Layer\Identity\Domain\ValueObject\Email;
+use src\Layer\Identity\Domain\ValueObject\PasswordHash;
+use src\Layer\Identity\Domain\ValueObject\UserId;
+use src\Layer\Identity\Infrastructure\Persistence\Eloquent\Model\UserModel;
 
 final class UserMapper
 {

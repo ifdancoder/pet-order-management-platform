@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace App\Layer\Identity\Domain\Entity;
+namespace src\Layer\Identity\Domain\Entity;
 
-use App\Layer\Identity\Domain\Enum\UserStatus;
-use App\Layer\Identity\Domain\Exception\UserAlreadyActive;
-use App\Layer\Identity\Domain\Exception\UserAlreadySuspended;
-use App\Layer\Identity\Domain\Exception\UserDisabled;
-use App\Layer\Identity\Domain\Exception\UserNotSuspended;
-use App\Layer\Identity\Domain\ValueObject\Email;
-use App\Layer\Identity\Domain\ValueObject\PasswordHash;
-use App\Layer\Identity\Domain\ValueObject\UserId;
+use src\Layer\Identity\Domain\Enum\UserStatus;
+use src\Layer\Identity\Domain\Exception\UserAlreadyActive;
+use src\Layer\Identity\Domain\Exception\UserAlreadySuspended;
+use src\Layer\Identity\Domain\Exception\UserDisabled;
+use src\Layer\Identity\Domain\Exception\UserNotSuspended;
+use src\Layer\Identity\Domain\ValueObject\Email;
+use src\Layer\Identity\Domain\ValueObject\PasswordHash;
+use src\Layer\Identity\Domain\ValueObject\UserId;
 
 final class User
 {

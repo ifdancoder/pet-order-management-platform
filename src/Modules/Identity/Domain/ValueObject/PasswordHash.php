@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Layer\Identity\Domain\ValueObject;
+namespace src\Layer\Identity\Domain\ValueObject;
 
-use App\Layer\Identity\Domain\Exception\InvalidPasswordHash;
+use src\Layer\Identity\Domain\Exception\InvalidPasswordHash;
 use Stringable;
 
 final readonly class PasswordHash implements Stringable
