@@ -31,7 +31,7 @@ final class UserModel extends Model
     protected function casts(): array
     {
         return [
-            'status' => 'string',
+            'status' => 'integer',
         ];
     }
 }
