@@ -4,12 +4,20 @@ declare(strict_types=1);
 
 namespace Modules\Identity\Infrastructure\Provider\V1;
 
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Lcobucci\JWT\Configuration;
+use Lcobucci\JWT\Signer\Key\InMemory;
+use Lcobucci\JWT\Signer\Rsa\Sha256;
+use LogicException;
+use Modules\Identity\Application\Port\Out\Authentication\IAccessTokenService;
 use Modules\Identity\Application\Port\Out\Identity\IUserIdGenerator;
 use Modules\Identity\Application\Port\Out\Persistence\IUserRepository;
 use Modules\Identity\Application\Port\Out\Security\IPasswordHasher;
 use Modules\Identity\Application\Port\Out\Transaction\ITransactionManager;
+use Modules\Identity\Infrastructure\Adapter\Out\Authentication\LcobucciAccessTokenService;
+use Modules\Identity\Infrastructure\Adapter\Out\Authentication\SystemClock;
 use Modules\Identity\Infrastructure\Adapter\Out\Identity\LaravelUserIdGenerator;
 use Modules\Identity\Infrastructure\Adapter\Out\Persistence\Eloquent\Repository\EloquentUserRepository;
 use Modules\Identity\Infrastructure\Adapter\Out\Security\LaravelPasswordHasher;
@@ -19,6 +27,56 @@ final class IdentityServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->singleton(
+            IAccessTokenService::class,
+            function (Application $application): IAccessTokenService {
+                $issuer = $application['config']->get(
+                    'identity.authentication.jwt.issuer',
+                );
+                $audience = $application['config']->get(
+                    'identity.authentication.jwt.audience',
+                );
+                $ttlSeconds = $application['config']->get(
+                    'identity.authentication.jwt.access_ttl_seconds',
+                );
+                $privateKeyPath = $application['config']->get(
+                    'identity.authentication.jwt.private_key_path',
+                );
+                $publicKeyPath = $application['config']->get(
+                    'identity.authentication.jwt.public_key_path',
+                );
+                $privateKeyPassphrase = $application['config']->get(
+                    'identity.authentication.jwt.private_key_passphrase',
+                );
+
+                if (
+                    ! is_string($issuer)
+                    || ! is_string($audience)
+                    || ! is_int($ttlSeconds)
+                    || ! is_string($privateKeyPath)
+                    || ! is_string($publicKeyPath)
+                    || ! is_string($privateKeyPassphrase)
+                ) {
+                    throw new LogicException('Identity JWT configuration is invalid.');
+                }
+
+                return new LcobucciAccessTokenService(
+                    configuration: Configuration::forAsymmetricSigner(
+                        signer: new Sha256,
+                        signingKey: InMemory::file(
+                            $privateKeyPath,
+                            $privateKeyPassphrase,
+                        ),
+                        verificationKey: InMemory::file($publicKeyPath),
+                    ),
+                    clock: new SystemClock,
+                    issuer: $issuer,
+                    audience: $audience,
+                    ttlSeconds: $ttlSeconds,
+                );
+            },
+        );
+
         $this->app->bind(
             IUserRepository::class,
             EloquentUserRepository::class,
