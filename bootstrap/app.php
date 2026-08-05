@@ -9,6 +9,11 @@ use Modules\Identity\Application\Exception\InvalidAccessToken;
 use Modules\Identity\Application\Exception\InvalidCredentials;
 use Modules\Identity\Application\Exception\InvalidRefreshToken;
 use Modules\Identity\Application\Exception\UserNotFound;
+use Modules\Identity\Domain\Exception\InvalidUserStatusTransition;
+use Modules\Identity\Domain\Exception\UserAlreadyActive;
+use Modules\Identity\Domain\Exception\UserAlreadySuspended;
+use Modules\Identity\Domain\Exception\UserDisabled;
+use Modules\Identity\Domain\Exception\UserNotSuspended;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -65,5 +70,16 @@ return Application::configure(basePath: dirname(__DIR__))
                     'message' => 'Access token is invalid.',
                 ],
             ], 401),
+        );
+
+        $exceptions->render(
+            fn (
+                InvalidUserStatusTransition|UserAlreadyActive|UserAlreadySuspended|UserDisabled|UserNotSuspended $exception,
+            ) => response()->json([
+                'error' => [
+                    'code' => 'invalid_user_status_transition',
+                    'message' => $exception->getMessage(),
+                ],
+            ], 409),
         );
     })->create();
