@@ -8,6 +8,10 @@ return [
             'issuer' => env('JWT_ISSUER', env('APP_URL', 'http://localhost')),
             'audience' => env('JWT_AUDIENCE', 'orderflow-api'),
             'access_ttl_seconds' => (int) env('JWT_ACCESS_TTL_SECONDS', 900),
+            'refresh_ttl_seconds' => (int) env(
+                'JWT_REFRESH_TTL_SECONDS',
+                2_592_000,
+            ),
             'private_key_path' => env(
                 'JWT_PRIVATE_KEY_PATH',
                 storage_path('app/keys/jwt-private.pem'),

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Identity\Infrastructure\Provider\V1;
 
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Lcobucci\JWT\Configuration;
@@ -12,10 +13,12 @@ use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Signer\Rsa\Sha256;
 use LogicException;
 use Modules\Identity\Application\Port\Out\Authentication\IAccessTokenService;
+use Modules\Identity\Application\Port\Out\Authentication\IRefreshTokenService;
 use Modules\Identity\Application\Port\Out\Identity\IUserIdGenerator;
 use Modules\Identity\Application\Port\Out\Persistence\IUserRepository;
 use Modules\Identity\Application\Port\Out\Security\IPasswordHasher;
 use Modules\Identity\Application\Port\Out\Transaction\ITransactionManager;
+use Modules\Identity\Infrastructure\Adapter\Out\Authentication\EloquentRefreshTokenService;
 use Modules\Identity\Infrastructure\Adapter\Out\Authentication\LcobucciAccessTokenService;
 use Modules\Identity\Infrastructure\Adapter\Out\Authentication\SystemClock;
 use Modules\Identity\Infrastructure\Adapter\Out\Identity\LaravelUserIdGenerator;
@@ -72,6 +75,27 @@ final class IdentityServiceProvider extends ServiceProvider
                     clock: new SystemClock,
                     issuer: $issuer,
                     audience: $audience,
+                    ttlSeconds: $ttlSeconds,
+                );
+            },
+        );
+
+        $this->app->singleton(
+            IRefreshTokenService::class,
+            function (Application $application): IRefreshTokenService {
+                $ttlSeconds = $application['config']->get(
+                    'identity.authentication.jwt.refresh_ttl_seconds',
+                );
+
+                if (! is_int($ttlSeconds)) {
+                    throw new LogicException(
+                        'Identity refresh token configuration is invalid.',
+                    );
+                }
+
+                return new EloquentRefreshTokenService(
+                    connection: $application->make(ConnectionInterface::class),
+                    clock: new SystemClock,
                     ttlSeconds: $ttlSeconds,
                 );
             },
