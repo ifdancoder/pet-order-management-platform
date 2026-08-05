@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace src\Layer\Identity\Domain\ValueObject;
+namespace Modules\Identity\Domain\ValueObject;
 
-use src\Layer\Identity\Domain\Exception\InvalidEmail;
+use Modules\Identity\Domain\Exception\InvalidEmail;
 use Stringable;
 
 final readonly class Email implements Stringable

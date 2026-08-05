@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace src\Layer\Identity\Domain\ValueObject;
+namespace Modules\Identity\Domain\ValueObject;
 
 use InvalidArgumentException;
 use Stringable;
@@ -13,7 +13,7 @@ final readonly class UserId implements Stringable
         private string $value,
     ) {
         if (! preg_match(
-            '/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',
+            '/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',
             $value,
         )) {
             throw new InvalidArgumentException('Invalid user ID.');

@@ -26,6 +26,8 @@
     },
     "autoload": {
         "psr-4": {
+            "Modules\\": "src/Modules/",
+            "Shared\\": "src/Shared/",
             "App\\": "app/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"

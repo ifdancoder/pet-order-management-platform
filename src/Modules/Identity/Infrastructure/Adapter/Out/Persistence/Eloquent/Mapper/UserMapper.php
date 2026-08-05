@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace src\Layer\Identity\Infrastructure\Persistence\Eloquent\Mapper;
+namespace Modules\Identity\Infrastructure\Adapter\Out\Persistence\Eloquent\Mapper;
 
-use src\Layer\Identity\Domain\Entity\User;
-use src\Layer\Identity\Domain\Enum\UserStatus;
-use src\Layer\Identity\Domain\ValueObject\Email;
-use src\Layer\Identity\Domain\ValueObject\PasswordHash;
-use src\Layer\Identity\Domain\ValueObject\UserId;
-use src\Layer\Identity\Infrastructure\Persistence\Eloquent\Model\UserModel;
+use Modules\Identity\Domain\Entity\User;
+use Modules\Identity\Domain\Enum\UserStatus;
+use Modules\Identity\Domain\ValueObject\Email;
+use Modules\Identity\Domain\ValueObject\PasswordHash;
+use Modules\Identity\Domain\ValueObject\UserId;
+use Modules\Identity\Infrastructure\Adapter\Out\Persistence\Eloquent\Model\UserModel;
 
 final class UserMapper
 {
@@ -25,7 +25,7 @@ final class UserMapper
 
     public function toModel(User $user): UserModel
     {
-        $model = new UserModel();
+        $model = new UserModel;
 
         $this->mapToModel($user, $model);
 

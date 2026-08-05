@@ -1,8 +1,7 @@
 <?php
 
-namespace src\Shared\Presentation\Http\Controllers;
+declare(strict_types=1);
 
-abstract class Controller
-{
-    //
-}
+namespace Shared\Presentation\Http\Controllers;
+
+abstract class Controller {}

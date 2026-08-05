@@ -2,16 +2,17 @@
 
 declare(strict_types=1);
 
-namespace src\Layer\Identity\Domain\Entity;
+namespace Modules\Identity\Domain\Entity;
 
-use src\Layer\Identity\Domain\Enum\UserStatus;
-use src\Layer\Identity\Domain\Exception\UserAlreadyActive;
-use src\Layer\Identity\Domain\Exception\UserAlreadySuspended;
-use src\Layer\Identity\Domain\Exception\UserDisabled;
-use src\Layer\Identity\Domain\Exception\UserNotSuspended;
-use src\Layer\Identity\Domain\ValueObject\Email;
-use src\Layer\Identity\Domain\ValueObject\PasswordHash;
-use src\Layer\Identity\Domain\ValueObject\UserId;
+use Modules\Identity\Domain\Enum\UserStatus;
+use Modules\Identity\Domain\Exception\InvalidUserStatusTransition;
+use Modules\Identity\Domain\Exception\UserAlreadyActive;
+use Modules\Identity\Domain\Exception\UserAlreadySuspended;
+use Modules\Identity\Domain\Exception\UserDisabled;
+use Modules\Identity\Domain\Exception\UserNotSuspended;
+use Modules\Identity\Domain\ValueObject\Email;
+use Modules\Identity\Domain\ValueObject\PasswordHash;
+use Modules\Identity\Domain\ValueObject\UserId;
 
 final class User
 {
@@ -65,6 +66,13 @@ final class User
             throw UserAlreadyActive::create();
         }
 
+        if ($this->status !== UserStatus::Pending) {
+            throw InvalidUserStatusTransition::fromTo(
+                $this->status,
+                UserStatus::Active,
+            );
+        }
+
         $this->status = UserStatus::Active;
     }
 
@@ -76,6 +84,13 @@ final class User
 
         if ($this->status === UserStatus::Suspended) {
             throw UserAlreadySuspended::create();
+        }
+
+        if ($this->status !== UserStatus::Active) {
+            throw InvalidUserStatusTransition::fromTo(
+                $this->status,
+                UserStatus::Suspended,
+            );
         }
 
         $this->status = UserStatus::Suspended;
@@ -92,6 +107,16 @@ final class User
 
     public function disable(): void
     {
+        if (
+            $this->status !== UserStatus::Active
+            && $this->status !== UserStatus::Suspended
+        ) {
+            throw InvalidUserStatusTransition::fromTo(
+                $this->status,
+                UserStatus::Disabled,
+            );
+        }
+
         $this->status = UserStatus::Disabled;
     }
 

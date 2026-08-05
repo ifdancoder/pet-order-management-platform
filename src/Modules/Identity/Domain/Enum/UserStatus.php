@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace src\Layer\Identity\Domain\Enum;
+namespace Modules\Identity\Domain\Enum;
 
 enum UserStatus: int
 {
