@@ -29,6 +29,7 @@ use Modules\Identity\Infrastructure\Adapter\Out\Identity\LaravelUserIdGenerator;
 use Modules\Identity\Infrastructure\Adapter\Out\Persistence\Eloquent\Repository\EloquentUserRepository;
 use Modules\Identity\Infrastructure\Adapter\Out\Security\LaravelPasswordHasher;
 use Modules\Identity\Infrastructure\Adapter\Out\Transaction\LaravelTransactionManager;
+use Modules\Identity\Infrastructure\Console\GenerateJwtKeysCommand;
 
 final class IdentityServiceProvider extends ServiceProvider
 {
@@ -128,6 +129,10 @@ final class IdentityServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        if ($this->app->runningInConsole()) {
+            $this->commands([GenerateJwtKeysCommand::class]);
+        }
+
         $this->registerRateLimiters();
         $this->registerRoutes();
     }
