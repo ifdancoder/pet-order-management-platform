@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Identity\Infrastructure\Provider\V1;
 
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\ConnectionInterface;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 use Lcobucci\JWT\Configuration;
 use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Signer\Rsa\Sha256;
@@ -124,7 +128,30 @@ final class IdentityServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->registerRateLimiters();
         $this->registerRoutes();
+    }
+
+    private function registerRateLimiters(): void
+    {
+        RateLimiter::for(
+            'identity-register',
+            fn (Request $request): Limit => Limit::perMinute(5)->by($request->ip()),
+        );
+
+        RateLimiter::for(
+            'identity-login',
+            fn (Request $request): Limit => Limit::perMinute(5)->by(
+                Str::lower($request->string('email')->toString()).'|'.$request->ip(),
+            ),
+        );
+
+        RateLimiter::for(
+            'identity-refresh',
+            fn (Request $request): Limit => Limit::perMinute(30)->by(
+                hash('sha256', $request->string('refresh_token')->toString()).'|'.$request->ip(),
+            ),
+        );
     }
 
     private function registerRoutes(): void
@@ -135,6 +162,7 @@ final class IdentityServiceProvider extends ServiceProvider
                 Route::prefix('identity')
                     ->name('identity.')
                     ->group(function (): void {
+                        $this->loadRoutesFrom(dirname(__DIR__, 3).'/Presentation/Http/V1/Routes/auth_routes.php');
                         $this->loadRoutesFrom(dirname(__DIR__, 3).'/Presentation/Http/V1/Routes/user_routes.php');
                     });
             });
