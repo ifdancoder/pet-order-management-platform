@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Identity\Infrastructure\Adapter\Out\Persistence\Eloquent\Repository;
 
+use Illuminate\Database\UniqueConstraintViolationException;
+use Modules\Identity\Application\Exception\EmailAlreadyExists;
 use Modules\Identity\Application\Port\Out\Persistence\IUserRepository;
 use Modules\Identity\Domain\Entity\User;
 use Modules\Identity\Domain\ValueObject\Email;
@@ -27,7 +29,14 @@ final readonly class EloquentUserRepository implements IUserRepository
 
         $this->mapper->mapToModel($user, $model);
 
-        $model->save();
+        try {
+            $model->save();
+        } catch (UniqueConstraintViolationException $exception) {
+            throw EmailAlreadyExists::withEmail(
+                $user->email()->value(),
+                $exception,
+            );
+        }
     }
 
     public function findById(UserId $id): ?User

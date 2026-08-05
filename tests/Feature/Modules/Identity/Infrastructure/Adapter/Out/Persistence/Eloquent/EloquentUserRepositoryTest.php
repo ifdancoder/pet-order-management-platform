@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Modules\Identity\Application\Exception\EmailAlreadyExists;
 use Modules\Identity\Domain\Entity\User;
 use Modules\Identity\Domain\Enum\UserStatus;
 use Modules\Identity\Domain\ValueObject\Email;
@@ -48,4 +48,4 @@ it('enforces email uniqueness in the database', function () {
         passwordHash: new PasswordHash('second-hash'),
         status: UserStatus::Active,
     ));
-})->throws(QueryException::class);
+})->throws(EmailAlreadyExists::class);
