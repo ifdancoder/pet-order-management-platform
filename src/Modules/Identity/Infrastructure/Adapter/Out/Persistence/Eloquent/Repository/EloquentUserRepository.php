@@ -48,6 +48,18 @@ final readonly class EloquentUserRepository implements IUserRepository
             : $this->mapper->toDomain($model);
     }
 
+    public function findByIdForUpdate(UserId $id): ?User
+    {
+        $model = UserModel::query()
+            ->whereKey($id->value())
+            ->lockForUpdate()
+            ->first();
+
+        return $model === null
+            ? null
+            : $this->mapper->toDomain($model);
+    }
+
     public function findByEmail(Email $email): ?User
     {
         $model = UserModel::query()

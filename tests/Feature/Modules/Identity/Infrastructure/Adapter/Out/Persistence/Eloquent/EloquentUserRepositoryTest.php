@@ -25,12 +25,14 @@ it('persists and reconstitutes a user entity', function () {
 
     $repository->save($user);
     $persistedUser = $repository->findById($user->id());
+    $lockedUser = $repository->findByIdForUpdate($user->id());
 
     expect($persistedUser)->not->toBeNull()
         ->and($persistedUser->id()->equals($user->id()))->toBeTrue()
         ->and($persistedUser->email()->value())->toBe('user@example.com')
         ->and($persistedUser->passwordHash()->value())->toBe('password-hash')
-        ->and($persistedUser->status())->toBe(UserStatus::Active);
+        ->and($persistedUser->status())->toBe(UserStatus::Active)
+        ->and($lockedUser?->id()->equals($user->id()))->toBeTrue();
 });
 
 it('enforces email uniqueness in the database', function () {

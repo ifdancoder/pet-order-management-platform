@@ -21,7 +21,7 @@ final readonly class ActivateUserHandler
     {
         return $this->transaction->run(
             function () use ($command): User {
-                $user = $this->users->findById(
+                $user = $this->users->findByIdForUpdate(
                     new UserId($command->userId),
                 );
 
