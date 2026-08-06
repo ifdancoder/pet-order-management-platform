@@ -80,6 +80,33 @@ final class Reservation
         return $this->status;
     }
 
+    /**
+     * @param  list<ReservationLine>  $lines
+     */
+    public function hasLines(array $lines): bool
+    {
+        if (count($this->lines) !== count($lines)) {
+            return false;
+        }
+
+        $quantitiesByItem = [];
+
+        foreach ($this->lines as $line) {
+            $quantitiesByItem[$line->inventoryItemId()->value()] = $line->quantity();
+        }
+
+        foreach ($lines as $line) {
+            if (
+                ($quantitiesByItem[$line->inventoryItemId()->value()] ?? null)
+                !== $line->quantity()
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public function release(): bool
     {
         if ($this->status === ReservationStatus::Released) {

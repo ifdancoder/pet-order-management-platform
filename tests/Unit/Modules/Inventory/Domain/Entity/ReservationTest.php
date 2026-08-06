@@ -38,6 +38,26 @@ it('rejects duplicate inventory items', function () {
     );
 })->throws(DuplicateReservationItem::class);
 
+it('matches the same lines independently of their order', function () {
+    $reservation = Reservation::create(
+        id: new ReservationId('018f22e2-7c2a-7a33-8c4c-4ea690ad4f31'),
+        key: new ReservationKey('checkout-123'),
+        lines: [
+            reservationLine('018f22e2-7c2a-7a33-8c4c-4ea690ad4f30', 2),
+            reservationLine('018f22e2-7c2a-7a33-8c4c-4ea690ad4f32', 3),
+        ],
+    );
+
+    expect($reservation->hasLines([
+        reservationLine('018f22e2-7c2a-7a33-8c4c-4ea690ad4f32', 3),
+        reservationLine('018f22e2-7c2a-7a33-8c4c-4ea690ad4f30', 2),
+    ]))->toBeTrue()
+        ->and($reservation->hasLines([
+            reservationLine('018f22e2-7c2a-7a33-8c4c-4ea690ad4f30', 1),
+            reservationLine('018f22e2-7c2a-7a33-8c4c-4ea690ad4f32', 3),
+        ]))->toBeFalse();
+});
+
 it('requires at least one reservation line', function () {
     Reservation::create(
         id: new ReservationId('018f22e2-7c2a-7a33-8c4c-4ea690ad4f31'),

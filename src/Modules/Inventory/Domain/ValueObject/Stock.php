@@ -10,10 +10,14 @@ use Modules\Inventory\Domain\Exception\InvalidStockRelease;
 
 final readonly class Stock
 {
-    public function __construct(
-        private int $onHand,
-        private int $reserved,
-    ) {
+    /** @var int<0, max> */
+    private int $onHand;
+
+    /** @var int<0, max> */
+    private int $reserved;
+
+    public function __construct(int $onHand, int $reserved)
+    {
         if ($onHand < 0) {
             throw new InvalidArgumentException('On-hand stock cannot be negative.');
         }
@@ -23,6 +27,9 @@ final readonly class Stock
                 'Reserved stock must be between zero and on-hand stock.',
             );
         }
+
+        $this->onHand = $onHand;
+        $this->reserved = $reserved;
     }
 
     public static function fromOnHand(int $onHand): self
@@ -30,11 +37,13 @@ final readonly class Stock
         return new self($onHand, 0);
     }
 
+    /** @return int<0, max> */
     public function onHand(): int
     {
         return $this->onHand;
     }
 
+    /** @return int<0, max> */
     public function reserved(): int
     {
         return $this->reserved;
