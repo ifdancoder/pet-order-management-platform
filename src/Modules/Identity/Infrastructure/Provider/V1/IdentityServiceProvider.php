@@ -17,12 +17,34 @@ use Lcobucci\JWT\Configuration;
 use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Signer\Rsa\Sha256;
 use LogicException;
+use Modules\Identity\Application\Command\ActivateUser\ActivateUserCommand;
+use Modules\Identity\Application\Command\ActivateUser\ActivateUserHandler;
+use Modules\Identity\Application\Command\DisableUser\DisableUserCommand;
+use Modules\Identity\Application\Command\DisableUser\DisableUserHandler;
+use Modules\Identity\Application\Command\Login\LoginCommand;
+use Modules\Identity\Application\Command\Login\LoginHandler;
+use Modules\Identity\Application\Command\Logout\LogoutCommand;
+use Modules\Identity\Application\Command\Logout\LogoutHandler;
+use Modules\Identity\Application\Command\RefreshAccessToken\RefreshAccessTokenCommand;
+use Modules\Identity\Application\Command\RefreshAccessToken\RefreshAccessTokenHandler;
+use Modules\Identity\Application\Command\RegisterUser\RegisterUserCommand;
+use Modules\Identity\Application\Command\RegisterUser\RegisterUserHandler;
+use Modules\Identity\Application\Command\RestoreUser\RestoreUserCommand;
+use Modules\Identity\Application\Command\RestoreUser\RestoreUserHandler;
+use Modules\Identity\Application\Command\SuspendUser\SuspendUserCommand;
+use Modules\Identity\Application\Command\SuspendUser\SuspendUserHandler;
+use Modules\Identity\Application\Command\UpdateUser\UpdateUserCommand;
+use Modules\Identity\Application\Command\UpdateUser\UpdateUserHandler;
 use Modules\Identity\Application\Port\Out\Authentication\IAccessTokenService;
 use Modules\Identity\Application\Port\Out\Authentication\IRefreshTokenService;
 use Modules\Identity\Application\Port\Out\Identity\IUserIdGenerator;
 use Modules\Identity\Application\Port\Out\Persistence\IUserRepository;
 use Modules\Identity\Application\Port\Out\Security\IPasswordHasher;
 use Modules\Identity\Application\Port\Out\Transaction\ITransactionManager;
+use Modules\Identity\Application\Query\FindUserByEmail\FindUserByEmailHandler;
+use Modules\Identity\Application\Query\FindUserByEmail\FindUserByEmailQuery;
+use Modules\Identity\Application\Query\GetUser\GetUserHandler;
+use Modules\Identity\Application\Query\GetUser\GetUserQuery;
 use Modules\Identity\Infrastructure\Adapter\Out\Authentication\EloquentRefreshTokenService;
 use Modules\Identity\Infrastructure\Adapter\Out\Authentication\LcobucciAccessTokenService;
 use Modules\Identity\Infrastructure\Adapter\Out\Authentication\SystemClock;
@@ -31,6 +53,7 @@ use Modules\Identity\Infrastructure\Adapter\Out\Persistence\Eloquent\Repository\
 use Modules\Identity\Infrastructure\Adapter\Out\Security\LaravelPasswordHasher;
 use Modules\Identity\Infrastructure\Adapter\Out\Transaction\LaravelTransactionManager;
 use Modules\Identity\Infrastructure\Console\GenerateJwtKeysCommand;
+use Shared\Infrastructure\Bus\HandlerRegistry;
 
 final class IdentityServiceProvider extends ServiceProvider
 {
@@ -133,12 +156,35 @@ final class IdentityServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->registerBusHandlers();
+
         if ($this->app->runningInConsole()) {
             $this->commands([GenerateJwtKeysCommand::class]);
         }
 
         $this->registerRateLimiters();
         $this->registerRoutes();
+    }
+
+    private function registerBusHandlers(): void
+    {
+        $handlers = $this->app->make(HandlerRegistry::class);
+
+        foreach ([
+            ActivateUserCommand::class => ActivateUserHandler::class,
+            DisableUserCommand::class => DisableUserHandler::class,
+            LoginCommand::class => LoginHandler::class,
+            LogoutCommand::class => LogoutHandler::class,
+            RefreshAccessTokenCommand::class => RefreshAccessTokenHandler::class,
+            RegisterUserCommand::class => RegisterUserHandler::class,
+            RestoreUserCommand::class => RestoreUserHandler::class,
+            SuspendUserCommand::class => SuspendUserHandler::class,
+            UpdateUserCommand::class => UpdateUserHandler::class,
+            FindUserByEmailQuery::class => FindUserByEmailHandler::class,
+            GetUserQuery::class => GetUserHandler::class,
+        ] as $messageClass => $handlerClass) {
+            $handlers->register($messageClass, $handlerClass);
+        }
     }
 
     private function registerRateLimiters(): void

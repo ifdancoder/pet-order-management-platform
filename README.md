@@ -63,6 +63,12 @@ The default Pest suites use an in-memory SQLite database. The integration suite 
 
 GitHub Actions runs Composer validation, Pint, Larastan, the SQLite test suite, and the PostgreSQL integration suite on pushes and pull requests. PostgreSQL is the only CI service currently required by implemented integration tests.
 
+## Application buses
+
+HTTP controllers dispatch typed commands and queries through the shared synchronous buses. Each module registers its handler mappings in its own service provider. Command middleware logs command class names and outcomes without serializing command payloads.
+
+The bus does not open database transactions. Transaction boundaries remain explicit inside application handlers so external network calls are not accidentally executed inside a transaction.
+
 ## Identity API
 
 Generate a new JWT key pair only when rotating local keys:

@@ -6,18 +6,18 @@ namespace Modules\Identity\Presentation\Http\V1\Controller;
 
 use Illuminate\Http\Response;
 use Modules\Identity\Application\Command\Logout\LogoutCommand;
-use Modules\Identity\Application\Command\Logout\LogoutHandler;
 use Modules\Identity\Presentation\Http\V1\Request\RefreshTokenRequest;
+use Shared\Application\Bus\Command\ICommandBus;
 
 final readonly class LogoutController
 {
     public function __construct(
-        private LogoutHandler $handler,
+        private ICommandBus $commandBus,
     ) {}
 
     public function __invoke(RefreshTokenRequest $request): Response
     {
-        ($this->handler)(new LogoutCommand(
+        $this->commandBus->dispatch(new LogoutCommand(
             refreshToken: $request->refreshToken(),
         ));
 
