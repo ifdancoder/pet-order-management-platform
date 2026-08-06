@@ -90,3 +90,9 @@ The profile API supports profile creation, retrieval and updates, plus adding, u
 Inventory exposes synchronous command/query contracts for item creation, restocking, reservation and release. A reservation may contain multiple inventory items and uses a caller-supplied reservation key for idempotency.
 
 Reservation handlers lock inventory rows in ascending ID order inside a PostgreSQL transaction. Stock constraints prevent negative quantities and reservations above on-hand stock. The integration suite runs competing PHP processes against PostgreSQL to prove that only one process can reserve the final unit and that concurrent retries with the same key apply once.
+
+## Orders
+
+Order provides internal command/query contracts for draft creation, item changes, placement and fulfillment transitions. Item prices and SKUs are captured as order-owned snapshots. Customer and Inventory are referenced only by IDs; the Order schema has no cross-module foreign keys or Eloquent relationships.
+
+Lifecycle changes lock the order row in a database transaction. Domain behavior permits `Draft → Placed → Confirmed → Processing → Shipped → Completed`, along with cancellation and payment-failure paths, and rejects every unsupported transition.
