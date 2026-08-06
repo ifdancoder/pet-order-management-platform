@@ -89,6 +89,16 @@ final readonly class EloquentCustomerRepository implements ICustomerRepository
         );
     }
 
+    public function findByIdentityUserIdForUpdate(IdentityUserId $identityUserId): ?Customer
+    {
+        $model = CustomerModel::query()
+            ->where('identity_user_id', $identityUserId->value())
+            ->lockForUpdate()
+            ->first();
+
+        return $model === null ? null : $this->hydrate($model);
+    }
+
     public function existsByIdentityUserId(IdentityUserId $identityUserId): bool
     {
         return CustomerModel::query()

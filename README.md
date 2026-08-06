@@ -78,3 +78,9 @@ docker compose exec app php artisan identity:generate-jwt-keys --force
 ```
 
 Identity routes are available below `/api/v1/identity`. Access tokens are signed RS256 JWTs. Refresh tokens are opaque, stored as hashes, and rotated on use.
+
+## Customer API
+
+Authenticated customer profile routes are available below `/api/v1/customers/profile`. The JWT identity is passed to Customer as an ID only; Customer does not query Identity tables or use cross-module Eloquent relationships.
+
+The profile API supports profile creation, retrieval and updates, plus adding, updating, selecting and removing delivery addresses. The first address becomes the default automatically, and the database prevents more than one default address per customer.

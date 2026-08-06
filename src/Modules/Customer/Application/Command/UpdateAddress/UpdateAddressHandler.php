@@ -8,7 +8,7 @@ use Modules\Customer\Application\Exception\CustomerNotFound;
 use Modules\Customer\Application\Port\Out\Persistence\ICustomerRepository;
 use Modules\Customer\Domain\Entity\Customer;
 use Modules\Customer\Domain\ValueObject\AddressId;
-use Modules\Customer\Domain\ValueObject\CustomerId;
+use Modules\Customer\Domain\ValueObject\IdentityUserId;
 use Shared\Application\Port\Out\Transaction\ITransactionManager;
 
 final readonly class UpdateAddressHandler
@@ -21,9 +21,9 @@ final readonly class UpdateAddressHandler
     public function __invoke(UpdateAddressCommand $command): Customer
     {
         return $this->transaction->run(function () use ($command): Customer {
-            $customer = $this->customers->findByIdForUpdate(
-                new CustomerId($command->customerId),
-            ) ?? throw CustomerNotFound::withId($command->customerId);
+            $customer = $this->customers->findByIdentityUserIdForUpdate(
+                new IdentityUserId($command->identityUserId),
+            ) ?? throw CustomerNotFound::forIdentity($command->identityUserId);
 
             $customer->updateAddress(
                 new AddressId($command->addressId),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Customer\Infrastructure\Provider;
 
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Modules\Customer\Application\Command\AddAddress\AddAddressCommand;
 use Modules\Customer\Application\Command\AddAddress\AddAddressHandler;
@@ -54,5 +55,10 @@ final class CustomerServiceProvider extends ServiceProvider
         ] as $messageClass => $handlerClass) {
             $handlers->register($messageClass, $handlerClass);
         }
+
+        Route::middleware('api')
+            ->prefix('api/v1/customers')
+            ->name('customers.')
+            ->group(dirname(__DIR__, 2).'/Presentation/Http/V1/Routes/customer_routes.php');
     }
 }

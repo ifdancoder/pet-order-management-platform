@@ -9,11 +9,10 @@ use Modules\Identity\Presentation\Http\V1\Controller\GetUserController;
 use Modules\Identity\Presentation\Http\V1\Controller\RestoreUserController;
 use Modules\Identity\Presentation\Http\V1\Controller\SuspendUserController;
 use Modules\Identity\Presentation\Http\V1\Controller\UpdateUserController;
-use Modules\Identity\Presentation\Http\V1\Middleware\AuthenticateAccessToken;
 
 Route::prefix('users')
     ->name('users.')
-    ->middleware(AuthenticateAccessToken::class)
+    ->middleware('identity.auth')
     ->group(function (): void {
         Route::get('/{userId}', GetUserController::class)
             ->whereUuid('userId')

@@ -22,6 +22,18 @@ arch('customer application has no framework or adapter dependencies')
         'Modules\Customer\Presentation',
     ]);
 
+arch('customer presentation does not depend on infrastructure')
+    ->expect('Modules\Customer\Presentation')
+    ->not->toUse('Modules\Customer\Infrastructure');
+
+arch('customer infrastructure does not depend on presentation classes')
+    ->expect('Modules\Customer\Infrastructure')
+    ->not->toUse([
+        'Modules\Customer\Presentation\Http\V1\Controller',
+        'Modules\Customer\Presentation\Http\V1\Request',
+        'Modules\Customer\Presentation\Http\V1\Resource',
+    ]);
+
 arch('customer does not depend on another modules infrastructure')
     ->expect('Modules\Customer')
     ->not->toUse([

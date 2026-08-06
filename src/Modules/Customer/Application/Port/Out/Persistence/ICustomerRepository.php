@@ -18,5 +18,7 @@ interface ICustomerRepository
 
     public function findByIdentityUserId(IdentityUserId $identityUserId): ?Customer;
 
+    public function findByIdentityUserIdForUpdate(IdentityUserId $identityUserId): ?Customer;
+
     public function existsByIdentityUserId(IdentityUserId $identityUserId): bool;
 }

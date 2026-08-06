@@ -4,6 +4,10 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Modules\Customer\Application\Exception\CustomerAlreadyExists;
+use Modules\Customer\Application\Exception\CustomerNotFound;
+use Modules\Customer\Domain\Exception\AddressNotFound;
+use Modules\Customer\Domain\Exception\CustomerArchived;
 use Modules\Identity\Application\Exception\EmailAlreadyExists;
 use Modules\Identity\Application\Exception\InvalidAccessToken;
 use Modules\Identity\Application\Exception\InvalidCredentials;
@@ -14,13 +18,16 @@ use Modules\Identity\Domain\Exception\UserAlreadyActive;
 use Modules\Identity\Domain\Exception\UserAlreadySuspended;
 use Modules\Identity\Domain\Exception\UserDisabled;
 use Modules\Identity\Domain\Exception\UserNotSuspended;
+use Modules\Identity\Presentation\Http\V1\Middleware\AuthenticateAccessToken;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->alias([
+            'identity.auth' => AuthenticateAccessToken::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
@@ -78,6 +85,42 @@ return Application::configure(basePath: dirname(__DIR__))
             ) => response()->json([
                 'error' => [
                     'code' => 'invalid_user_status_transition',
+                    'message' => $exception->getMessage(),
+                ],
+            ], 409),
+        );
+
+        $exceptions->render(
+            fn (CustomerNotFound $exception) => response()->json([
+                'error' => [
+                    'code' => 'customer_not_found',
+                    'message' => 'Customer was not found.',
+                ],
+            ], 404),
+        );
+
+        $exceptions->render(
+            fn (AddressNotFound $exception) => response()->json([
+                'error' => [
+                    'code' => 'address_not_found',
+                    'message' => 'Address was not found.',
+                ],
+            ], 404),
+        );
+
+        $exceptions->render(
+            fn (CustomerAlreadyExists $exception) => response()->json([
+                'error' => [
+                    'code' => 'customer_already_exists',
+                    'message' => 'A customer profile already exists.',
+                ],
+            ], 409),
+        );
+
+        $exceptions->render(
+            fn (CustomerArchived $exception) => response()->json([
+                'error' => [
+                    'code' => 'customer_archived',
                     'message' => $exception->getMessage(),
                 ],
             ], 409),

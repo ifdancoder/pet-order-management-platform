@@ -12,7 +12,7 @@ use Shared\Application\Bus\Command\ICommand;
 final readonly class UpdateAddressCommand implements ICommand
 {
     public function __construct(
-        public string $customerId,
+        public string $identityUserId,
         public string $addressId,
         public AddressData $address,
     ) {}

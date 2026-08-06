@@ -43,7 +43,7 @@ final readonly class AuthenticateAccessToken
             throw InvalidAccessToken::create();
         }
 
-        $request->attributes->set('identity.authenticated_user', $user);
+        $request->attributes->set('identity.user_id', $user->id()->value());
 
         return $next($request);
     }

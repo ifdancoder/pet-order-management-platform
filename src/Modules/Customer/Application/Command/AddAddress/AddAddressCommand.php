@@ -12,7 +12,7 @@ use Shared\Application\Bus\Command\ICommand;
 final readonly class AddAddressCommand implements ICommand
 {
     public function __construct(
-        public string $customerId,
+        public string $identityUserId,
         public AddressData $address,
         public bool $makeDefault,
     ) {}

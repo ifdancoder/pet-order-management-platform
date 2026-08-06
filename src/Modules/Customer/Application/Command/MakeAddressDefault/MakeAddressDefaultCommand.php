@@ -11,7 +11,7 @@ use Shared\Application\Bus\Command\ICommand;
 final readonly class MakeAddressDefaultCommand implements ICommand
 {
     public function __construct(
-        public string $customerId,
+        public string $identityUserId,
         public string $addressId,
     ) {}
 }
