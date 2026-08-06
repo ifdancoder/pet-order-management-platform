@@ -53,9 +53,10 @@ Run checks inside the application container:
 docker compose exec app composer validate --strict
 docker compose exec app vendor/bin/pint --format agent
 docker compose exec app php artisan test --compact
+docker compose exec app composer test:integration
 ```
 
-The default Pest suites use an in-memory SQLite database.
+The default Pest suites use an in-memory SQLite database. The integration suite uses the dedicated `orderflow_test` PostgreSQL database and verifies PostgreSQL-specific constraints and row locking.
 
 ## Identity API
 
