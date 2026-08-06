@@ -59,6 +59,10 @@ docker compose exec app composer test:integration
 
 The default Pest suites use an in-memory SQLite database. The integration suite uses the dedicated `orderflow_test` PostgreSQL database and verifies PostgreSQL-specific constraints and row locking.
 
+## Continuous integration
+
+GitHub Actions runs Composer validation, Pint, Larastan, the SQLite test suite, and the PostgreSQL integration suite on pushes and pull requests. PostgreSQL is the only CI service currently required by implemented integration tests.
+
 ## Identity API
 
 Generate a new JWT key pair only when rotating local keys:
