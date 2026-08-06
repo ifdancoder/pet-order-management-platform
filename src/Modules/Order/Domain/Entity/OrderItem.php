@@ -11,10 +11,13 @@ use Shared\Domain\ValueObject\Money;
 
 final readonly class OrderItem
 {
+    /** @var int<1, max> */
+    private int $quantity;
+
     public function __construct(
         private InventoryItemId $inventoryItemId,
         private Sku $sku,
-        private int $quantity,
+        int $quantity,
         private Money $unitPrice,
     ) {
         if ($quantity < 1) {
@@ -22,6 +25,8 @@ final readonly class OrderItem
                 'Order item quantity must be positive.',
             );
         }
+
+        $this->quantity = $quantity;
     }
 
     public function inventoryItemId(): InventoryItemId
@@ -34,6 +39,7 @@ final readonly class OrderItem
         return $this->sku;
     }
 
+    /** @return int<1, max> */
     public function quantity(): int
     {
         return $this->quantity;

@@ -9,8 +9,11 @@ use Shared\Domain\Exception\CurrencyMismatch;
 
 final readonly class Money
 {
+    /** @var int<0, max> */
+    private int $amount;
+
     public function __construct(
-        private int $amount,
+        int $amount,
         private string $currency,
     ) {
         if ($amount < 0) {
@@ -22,6 +25,8 @@ final readonly class Money
                 'Currency must be an ISO 4217 alpha-3 code.',
             );
         }
+
+        $this->amount = $amount;
     }
 
     public static function zero(string $currency): self
@@ -29,6 +34,7 @@ final readonly class Money
         return new self(0, $currency);
     }
 
+    /** @return int<0, max> */
     public function amount(): int
     {
         return $this->amount;

@@ -1,0 +1,49 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Order\Infrastructure\Provider;
+
+use Illuminate\Support\ServiceProvider;
+use Modules\Order\Application\Command\AddOrderItem\AddOrderItemCommand;
+use Modules\Order\Application\Command\AddOrderItem\AddOrderItemHandler;
+use Modules\Order\Application\Command\CreateOrderDraft\CreateOrderDraftCommand;
+use Modules\Order\Application\Command\CreateOrderDraft\CreateOrderDraftHandler;
+use Modules\Order\Application\Command\PlaceOrder\PlaceOrderCommand;
+use Modules\Order\Application\Command\PlaceOrder\PlaceOrderHandler;
+use Modules\Order\Application\Command\RemoveOrderItem\RemoveOrderItemCommand;
+use Modules\Order\Application\Command\RemoveOrderItem\RemoveOrderItemHandler;
+use Modules\Order\Application\Command\TransitionOrder\TransitionOrderCommand;
+use Modules\Order\Application\Command\TransitionOrder\TransitionOrderHandler;
+use Modules\Order\Application\Port\Out\Identity\IOrderIdGenerator;
+use Modules\Order\Application\Port\Out\Persistence\IOrderRepository;
+use Modules\Order\Application\Query\GetOrder\GetOrderHandler;
+use Modules\Order\Application\Query\GetOrder\GetOrderQuery;
+use Modules\Order\Infrastructure\Adapter\Out\Identity\LaravelOrderIdGenerator;
+use Modules\Order\Infrastructure\Adapter\Out\Persistence\Eloquent\Repository\EloquentOrderRepository;
+use Shared\Infrastructure\Bus\HandlerRegistry;
+
+final class OrderServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        $this->app->bind(IOrderRepository::class, EloquentOrderRepository::class);
+        $this->app->bind(IOrderIdGenerator::class, LaravelOrderIdGenerator::class);
+    }
+
+    public function boot(): void
+    {
+        $handlers = $this->app->make(HandlerRegistry::class);
+
+        foreach ([
+            AddOrderItemCommand::class => AddOrderItemHandler::class,
+            CreateOrderDraftCommand::class => CreateOrderDraftHandler::class,
+            PlaceOrderCommand::class => PlaceOrderHandler::class,
+            RemoveOrderItemCommand::class => RemoveOrderItemHandler::class,
+            TransitionOrderCommand::class => TransitionOrderHandler::class,
+            GetOrderQuery::class => GetOrderHandler::class,
+        ] as $messageClass => $handlerClass) {
+            $handlers->register($messageClass, $handlerClass);
+        }
+    }
+}
