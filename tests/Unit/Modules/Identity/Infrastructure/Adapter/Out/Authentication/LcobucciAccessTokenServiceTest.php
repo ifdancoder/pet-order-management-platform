@@ -134,3 +134,12 @@ it('rejects a token with a modified signature', function () {
 
     $service->verify($modifiedToken);
 })->throws(InvalidAccessToken::class);
+
+it('rejects an empty access token', function () {
+    $service = identityAccessTokenService(
+        identityJwtConfiguration(),
+        '2026-09-27T10:00:00+00:00',
+    );
+
+    $service->verify('');
+})->throws(InvalidAccessToken::class);

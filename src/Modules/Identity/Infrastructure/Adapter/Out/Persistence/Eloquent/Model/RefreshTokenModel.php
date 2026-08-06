@@ -4,8 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Identity\Infrastructure\Adapter\Out\Persistence\Eloquent\Model;
 
+use DateTimeImmutable;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @property DateTimeImmutable $expires_at
+ * @property DateTimeImmutable|null $consumed_at
+ * @property DateTimeImmutable|null $revoked_at
+ */
 final class RefreshTokenModel extends Model
 {
     protected $table = 'identity_refresh_tokens';

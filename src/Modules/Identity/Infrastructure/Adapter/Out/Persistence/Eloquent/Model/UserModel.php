@@ -10,6 +10,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 
 final class UserModel extends Authenticatable
 {
+    /** @use HasFactory<UserModelFactory> */
     use HasFactory;
 
     protected $table = 'users';

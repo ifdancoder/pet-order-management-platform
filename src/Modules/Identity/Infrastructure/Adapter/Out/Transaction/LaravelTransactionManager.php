@@ -13,8 +13,16 @@ final readonly class LaravelTransactionManager implements ITransactionManager
         private ConnectionInterface $connection,
     ) {}
 
+    /**
+     * @template T
+     *
+     * @param  callable(): T  $callback
+     * @return T
+     */
     public function run(callable $callback): mixed
     {
-        return $this->connection->transaction($callback);
+        return $this->connection->transaction(
+            static fn (ConnectionInterface $connection): mixed => $callback(),
+        );
     }
 }

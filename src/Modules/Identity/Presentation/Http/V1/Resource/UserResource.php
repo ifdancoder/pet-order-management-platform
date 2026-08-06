@@ -10,20 +10,22 @@ use Modules\Identity\Domain\Entity\User;
 
 final class UserResource extends JsonResource
 {
+    private User $user;
+
     public function __construct(User $resource)
     {
         parent::__construct($resource);
+
+        $this->user = $resource;
     }
 
+    /** @return array{id: string, email: string, status: int} */
     public function toArray(Request $request): array
     {
-        /** @var User $user */
-        $user = $this->resource;
-
         return [
-            'id' => $user->id()->value(),
-            'email' => $user->email()->value(),
-            'status' => $user->status()->value,
+            'id' => $this->user->id()->value(),
+            'email' => $this->user->email()->value(),
+            'status' => $this->user->status()->value,
         ];
     }
 }

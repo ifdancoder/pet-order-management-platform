@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Identity\Infrastructure\Provider\V1;
 
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Http\Request;
@@ -38,31 +39,32 @@ final class IdentityServiceProvider extends ServiceProvider
         $this->app->singleton(
             IAccessTokenService::class,
             function (Application $application): IAccessTokenService {
-                $issuer = $application['config']->get(
+                $config = $application->make(ConfigRepository::class);
+                $issuer = $config->get(
                     'identity.authentication.jwt.issuer',
                 );
-                $audience = $application['config']->get(
+                $audience = $config->get(
                     'identity.authentication.jwt.audience',
                 );
-                $ttlSeconds = $application['config']->get(
+                $ttlSeconds = $config->get(
                     'identity.authentication.jwt.access_ttl_seconds',
                 );
-                $privateKeyPath = $application['config']->get(
+                $privateKeyPath = $config->get(
                     'identity.authentication.jwt.private_key_path',
                 );
-                $publicKeyPath = $application['config']->get(
+                $publicKeyPath = $config->get(
                     'identity.authentication.jwt.public_key_path',
                 );
-                $privateKeyPassphrase = $application['config']->get(
+                $privateKeyPassphrase = $config->get(
                     'identity.authentication.jwt.private_key_passphrase',
                 );
 
                 if (
-                    ! is_string($issuer)
-                    || ! is_string($audience)
+                    ! is_string($issuer) || $issuer === ''
+                    || ! is_string($audience) || $audience === ''
                     || ! is_int($ttlSeconds)
-                    || ! is_string($privateKeyPath)
-                    || ! is_string($publicKeyPath)
+                    || ! is_string($privateKeyPath) || $privateKeyPath === ''
+                    || ! is_string($publicKeyPath) || $publicKeyPath === ''
                     || ! is_string($privateKeyPassphrase)
                 ) {
                     throw new LogicException('Identity JWT configuration is invalid.');
@@ -88,9 +90,11 @@ final class IdentityServiceProvider extends ServiceProvider
         $this->app->singleton(
             IRefreshTokenService::class,
             function (Application $application): IRefreshTokenService {
-                $ttlSeconds = $application['config']->get(
-                    'identity.authentication.jwt.refresh_ttl_seconds',
-                );
+                $ttlSeconds = $application
+                    ->make(ConfigRepository::class)
+                    ->get(
+                        'identity.authentication.jwt.refresh_ttl_seconds',
+                    );
 
                 if (! is_int($ttlSeconds)) {
                     throw new LogicException(

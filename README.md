@@ -52,6 +52,7 @@ Run checks inside the application container:
 ```bash
 docker compose exec app composer validate --strict
 docker compose exec app vendor/bin/pint --format agent
+docker compose exec app composer analyse
 docker compose exec app php artisan test --compact
 docker compose exec app composer test:integration
 ```

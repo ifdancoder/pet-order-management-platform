@@ -25,11 +25,17 @@ use Psr\Clock\ClockInterface;
 
 final readonly class LcobucciAccessTokenService implements IAccessTokenService
 {
+    /** @var non-empty-string */
+    private string $issuer;
+
+    /** @var non-empty-string */
+    private string $audience;
+
     public function __construct(
         private Configuration $configuration,
         private ClockInterface $clock,
-        private string $issuer,
-        private string $audience,
+        string $issuer,
+        string $audience,
         private int $ttlSeconds,
     ) {
         if ($issuer === '' || $audience === '' || $ttlSeconds < 1) {
@@ -37,6 +43,9 @@ final readonly class LcobucciAccessTokenService implements IAccessTokenService
                 'JWT issuer, audience, and positive TTL are required.',
             );
         }
+
+        $this->issuer = $issuer;
+        $this->audience = $audience;
     }
 
     public function issue(User $user): IssuedAccessToken
@@ -68,6 +77,10 @@ final readonly class LcobucciAccessTokenService implements IAccessTokenService
 
     public function verify(string $token): AccessTokenClaims
     {
+        if ($token === '') {
+            throw InvalidAccessToken::create();
+        }
+
         try {
             $parsedToken = $this->configuration->parser()->parse($token);
         } catch (
