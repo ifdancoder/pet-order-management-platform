@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Inventory\Infrastructure\Provider;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\Inventory\Application\Checkout\InventoryCheckout;
 use Modules\Inventory\Application\Command\CreateInventoryItem\CreateInventoryItemCommand;
 use Modules\Inventory\Application\Command\CreateInventoryItem\CreateInventoryItemHandler;
 use Modules\Inventory\Application\Command\ReleaseReservation\ReleaseReservationCommand;
@@ -13,6 +14,7 @@ use Modules\Inventory\Application\Command\ReserveStock\ReserveStockCommand;
 use Modules\Inventory\Application\Command\ReserveStock\ReserveStockHandler;
 use Modules\Inventory\Application\Command\RestockInventoryItem\RestockInventoryItemCommand;
 use Modules\Inventory\Application\Command\RestockInventoryItem\RestockInventoryItemHandler;
+use Modules\Inventory\Application\Port\In\IInventoryCheckout;
 use Modules\Inventory\Application\Port\Out\Identity\IInventoryItemIdGenerator;
 use Modules\Inventory\Application\Port\Out\Identity\IReservationIdGenerator;
 use Modules\Inventory\Application\Port\Out\Persistence\IInventoryItemRepository;
@@ -45,6 +47,7 @@ final class InventoryServiceProvider extends ServiceProvider
             IReservationIdGenerator::class,
             LaravelReservationIdGenerator::class,
         );
+        $this->app->bind(IInventoryCheckout::class, InventoryCheckout::class);
     }
 
     public function boot(): void

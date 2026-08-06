@@ -6,6 +6,7 @@ namespace Modules\Customer\Infrastructure\Provider;
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Modules\Customer\Application\Checkout\CustomerCheckout;
 use Modules\Customer\Application\Command\AddAddress\AddAddressCommand;
 use Modules\Customer\Application\Command\AddAddress\AddAddressHandler;
 use Modules\Customer\Application\Command\MakeAddressDefault\MakeAddressDefaultCommand;
@@ -18,6 +19,7 @@ use Modules\Customer\Application\Command\UpdateAddress\UpdateAddressCommand;
 use Modules\Customer\Application\Command\UpdateAddress\UpdateAddressHandler;
 use Modules\Customer\Application\Command\UpdateCustomer\UpdateCustomerCommand;
 use Modules\Customer\Application\Command\UpdateCustomer\UpdateCustomerHandler;
+use Modules\Customer\Application\Port\In\ICustomerCheckout;
 use Modules\Customer\Application\Port\Out\Identity\IAddressIdGenerator;
 use Modules\Customer\Application\Port\Out\Identity\ICustomerIdGenerator;
 use Modules\Customer\Application\Port\Out\Persistence\ICustomerRepository;
@@ -37,6 +39,7 @@ final class CustomerServiceProvider extends ServiceProvider
         $this->app->bind(ICustomerRepository::class, EloquentCustomerRepository::class);
         $this->app->bind(ICustomerIdGenerator::class, LaravelCustomerIdGenerator::class);
         $this->app->bind(IAddressIdGenerator::class, LaravelAddressIdGenerator::class);
+        $this->app->bind(ICustomerCheckout::class, CustomerCheckout::class);
     }
 
     public function boot(): void
