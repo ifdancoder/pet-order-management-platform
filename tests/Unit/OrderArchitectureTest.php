@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Modules\Order\Application\Command\Checkout\CheckoutCommand;
 use Shared\Application\Bus\Command\ICommand;
 use Shared\Application\Bus\Query\IQuery;
 
@@ -43,6 +44,7 @@ arch('order application ports use the interface prefix')
 arch('order commands declare their result contract')
     ->expect([
         'Modules\Order\Application\Command\AddOrderItem\AddOrderItemCommand',
+        CheckoutCommand::class,
         'Modules\Order\Application\Command\CreateOrderDraft\CreateOrderDraftCommand',
         'Modules\Order\Application\Command\PlaceOrder\PlaceOrderCommand',
         'Modules\Order\Application\Command\RemoveOrderItem\RemoveOrderItemCommand',
