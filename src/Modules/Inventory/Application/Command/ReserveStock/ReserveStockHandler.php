@@ -67,20 +67,20 @@ final readonly class ReserveStockHandler
                     $itemsById[$inventoryItem->id()->value()] = $inventoryItem;
                 }
 
-                foreach ($lines as $line) {
-                    $inventoryItem = $itemsById[$line->inventoryItemId()->value()]
-                        ?? throw InventoryItemNotFound::withId(
-                            $line->inventoryItemId()->value(),
-                        );
-                    $inventoryItem->reserve($line->quantity());
-                }
-
                 $existingReservation = $this->reservations->findByKey(
                     $reservationKey,
                 );
 
                 if ($existingReservation !== null) {
                     return $this->resolveExisting($existingReservation, $lines);
+                }
+
+                foreach ($lines as $line) {
+                    $inventoryItem = $itemsById[$line->inventoryItemId()->value()]
+                        ?? throw InventoryItemNotFound::withId(
+                            $line->inventoryItemId()->value(),
+                        );
+                    $inventoryItem->reserve($line->quantity());
                 }
 
                 $this->inventoryItems->saveMany(array_values($itemsById));

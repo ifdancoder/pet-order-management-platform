@@ -84,3 +84,9 @@ Identity routes are available below `/api/v1/identity`. Access tokens are signed
 Authenticated customer profile routes are available below `/api/v1/customers/profile`. The JWT identity is passed to Customer as an ID only; Customer does not query Identity tables or use cross-module Eloquent relationships.
 
 The profile API supports profile creation, retrieval and updates, plus adding, updating, selecting and removing delivery addresses. The first address becomes the default automatically, and the database prevents more than one default address per customer.
+
+## Inventory reservations
+
+Inventory exposes synchronous command/query contracts for item creation, restocking, reservation and release. A reservation may contain multiple inventory items and uses a caller-supplied reservation key for idempotency.
+
+Reservation handlers lock inventory rows in ascending ID order inside a PostgreSQL transaction. Stock constraints prevent negative quantities and reservations above on-hand stock. The integration suite runs competing PHP processes against PostgreSQL to prove that only one process can reserve the final unit and that concurrent retries with the same key apply once.
