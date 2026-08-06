@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Identity\Application\Port\Out\Transaction;
+namespace Shared\Application\Port\Out\Transaction;
 
 interface ITransactionManager
 {

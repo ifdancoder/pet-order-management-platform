@@ -6,9 +6,9 @@ namespace Modules\Identity\Application\Command\RestoreUser;
 
 use Modules\Identity\Application\Exception\UserNotFound;
 use Modules\Identity\Application\Port\Out\Persistence\IUserRepository;
-use Modules\Identity\Application\Port\Out\Transaction\ITransactionManager;
 use Modules\Identity\Domain\Entity\User;
 use Modules\Identity\Domain\ValueObject\UserId;
+use Shared\Application\Port\Out\Transaction\ITransactionManager;
 
 final readonly class RestoreUserHandler
 {

@@ -40,7 +40,6 @@ use Modules\Identity\Application\Port\Out\Authentication\IRefreshTokenService;
 use Modules\Identity\Application\Port\Out\Identity\IUserIdGenerator;
 use Modules\Identity\Application\Port\Out\Persistence\IUserRepository;
 use Modules\Identity\Application\Port\Out\Security\IPasswordHasher;
-use Modules\Identity\Application\Port\Out\Transaction\ITransactionManager;
 use Modules\Identity\Application\Query\FindUserByEmail\FindUserByEmailHandler;
 use Modules\Identity\Application\Query\FindUserByEmail\FindUserByEmailQuery;
 use Modules\Identity\Application\Query\GetUser\GetUserHandler;
@@ -51,7 +50,6 @@ use Modules\Identity\Infrastructure\Adapter\Out\Authentication\SystemClock;
 use Modules\Identity\Infrastructure\Adapter\Out\Identity\LaravelUserIdGenerator;
 use Modules\Identity\Infrastructure\Adapter\Out\Persistence\Eloquent\Repository\EloquentUserRepository;
 use Modules\Identity\Infrastructure\Adapter\Out\Security\LaravelPasswordHasher;
-use Modules\Identity\Infrastructure\Adapter\Out\Transaction\LaravelTransactionManager;
 use Modules\Identity\Infrastructure\Console\GenerateJwtKeysCommand;
 use Shared\Infrastructure\Bus\HandlerRegistry;
 
@@ -148,10 +146,6 @@ final class IdentityServiceProvider extends ServiceProvider
             LaravelUserIdGenerator::class,
         );
 
-        $this->app->bind(
-            ITransactionManager::class,
-            LaravelTransactionManager::class,
-        );
     }
 
     public function boot(): void

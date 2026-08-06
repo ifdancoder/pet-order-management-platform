@@ -8,9 +8,9 @@ use Modules\Identity\Application\Exception\EmailAlreadyExists;
 use Modules\Identity\Application\Port\Out\Identity\IUserIdGenerator;
 use Modules\Identity\Application\Port\Out\Persistence\IUserRepository;
 use Modules\Identity\Application\Port\Out\Security\IPasswordHasher;
-use Modules\Identity\Application\Port\Out\Transaction\ITransactionManager;
 use Modules\Identity\Domain\Entity\User;
 use Modules\Identity\Domain\ValueObject\Email;
+use Shared\Application\Port\Out\Transaction\ITransactionManager;
 
 final readonly class RegisterUserHandler
 {

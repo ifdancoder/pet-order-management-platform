@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Modules\Identity\Infrastructure\Adapter\Out\Transaction;
+namespace Shared\Infrastructure\Persistence;
 
 use Illuminate\Database\ConnectionInterface;
-use Modules\Identity\Application\Port\Out\Transaction\ITransactionManager;
+use Shared\Application\Port\Out\Transaction\ITransactionManager;
 
 final readonly class LaravelTransactionManager implements ITransactionManager
 {
