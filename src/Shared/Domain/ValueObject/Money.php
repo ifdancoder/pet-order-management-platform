@@ -63,6 +63,26 @@ final readonly class Money
         return new self($this->amount * $multiplier, $this->currency);
     }
 
+    public function subtract(self $other): self
+    {
+        $this->guardSameCurrency($other);
+
+        if ($other->amount > $this->amount) {
+            throw new InvalidArgumentException(
+                'Money subtraction cannot produce a negative amount.',
+            );
+        }
+
+        return new self($this->amount - $other->amount, $this->currency);
+    }
+
+    public function minimum(self $other): self
+    {
+        $this->guardSameCurrency($other);
+
+        return $this->amount <= $other->amount ? $this : $other;
+    }
+
     public function equals(self $other): bool
     {
         return $this->amount === $other->amount
