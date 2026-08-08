@@ -7,6 +7,7 @@ namespace Modules\Payment\Infrastructure\Provider;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
@@ -20,6 +21,8 @@ use Modules\Payment\Application\Port\Out\Order\IOrderPaymentGateway;
 use Modules\Payment\Application\Port\Out\Persistence\IPaymentRepository;
 use Modules\Payment\Infrastructure\Adapter\Out\Gateway\FakePaymentGateway;
 use Modules\Payment\Infrastructure\Adapter\Out\Gateway\PaymentGatewayResolver;
+use Modules\Payment\Infrastructure\Adapter\Out\Gateway\PayPalPaymentGateway;
+use Modules\Payment\Infrastructure\Adapter\Out\Gateway\StripePaymentGateway;
 use Modules\Payment\Infrastructure\Adapter\Out\Identity\LaravelPaymentIdGenerator;
 use Modules\Payment\Infrastructure\Adapter\Out\Order\OrderPaymentGateway;
 use Modules\Payment\Infrastructure\Adapter\Out\Persistence\Eloquent\Repository\EloquentPaymentRepository;
@@ -29,6 +32,7 @@ final class PaymentServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $config = $this->app->make(ConfigRepository::class);
         $this->app->bind(IPaymentRepository::class, EloquentPaymentRepository::class);
         $this->app->bind(IPaymentIdGenerator::class, LaravelPaymentIdGenerator::class);
         $this->app->bind(IOrderPaymentGateway::class, OrderPaymentGateway::class);
@@ -45,10 +49,48 @@ final class PaymentServiceProvider extends ServiceProvider
                 return new FakePaymentGateway($decline);
             },
         );
-        $this->app->tag(
-            [FakePaymentGateway::class],
-            'payment.gateways',
-        );
+        $gatewayClasses = [FakePaymentGateway::class];
+
+        $stripeSecretKey = $config->get('payment.stripe.secret_key');
+        $stripeBaseUrl = $config->get('payment.stripe.base_url');
+
+        if (
+            is_string($stripeSecretKey) && $stripeSecretKey !== ''
+            && is_string($stripeBaseUrl) && $stripeBaseUrl !== ''
+        ) {
+            $this->app->singleton(
+                StripePaymentGateway::class,
+                fn (Application $application): StripePaymentGateway => new StripePaymentGateway(
+                    http: $application->make(HttpFactory::class),
+                    secretKey: $stripeSecretKey,
+                    baseUrl: rtrim($stripeBaseUrl, '/'),
+                ),
+            );
+            $gatewayClasses[] = StripePaymentGateway::class;
+        }
+
+        $payPalClientId = $config->get('payment.paypal.client_id');
+        $payPalClientSecret = $config->get('payment.paypal.client_secret');
+        $payPalBaseUrl = $config->get('payment.paypal.base_url');
+
+        if (
+            is_string($payPalClientId) && $payPalClientId !== ''
+            && is_string($payPalClientSecret) && $payPalClientSecret !== ''
+            && is_string($payPalBaseUrl) && $payPalBaseUrl !== ''
+        ) {
+            $this->app->singleton(
+                PayPalPaymentGateway::class,
+                fn (Application $application): PayPalPaymentGateway => new PayPalPaymentGateway(
+                    http: $application->make(HttpFactory::class),
+                    clientId: $payPalClientId,
+                    clientSecret: $payPalClientSecret,
+                    baseUrl: rtrim($payPalBaseUrl, '/'),
+                ),
+            );
+            $gatewayClasses[] = PayPalPaymentGateway::class;
+        }
+
+        $this->app->tag($gatewayClasses, 'payment.gateways');
         $this->app->singleton(
             IPaymentGatewayResolver::class,
             fn (): PaymentGatewayResolver => new PaymentGatewayResolver(

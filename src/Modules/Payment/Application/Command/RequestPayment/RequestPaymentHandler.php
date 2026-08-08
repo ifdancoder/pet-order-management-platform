@@ -38,7 +38,11 @@ final readonly class RequestPaymentHandler
             $command->identityUserId,
         ) ?? throw PaymentNotAllowed::forOrder($command->orderId);
         $idempotencyKey = new IdempotencyKey($command->idempotencyKey);
-        $requestHash = $this->requestHasher->hash($order, $command->provider);
+        $requestHash = $this->requestHasher->hash(
+            $order,
+            $command->provider,
+            $command->paymentMethodReference,
+        );
 
         $payment = $this->transaction->run(
             function () use ($command, $order, $idempotencyKey, $requestHash): Payment {
@@ -80,6 +84,7 @@ final readonly class RequestPaymentHandler
                 amount: $payment->amount()->amount(),
                 currency: $payment->amount()->currency(),
                 idempotencyKey: $payment->idempotencyKey()->value(),
+                paymentMethodReference: $command->paymentMethodReference,
             ));
 
         return $this->applyGatewayResult($payment, $result);

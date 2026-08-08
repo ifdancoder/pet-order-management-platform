@@ -71,6 +71,7 @@ it('rejects reuse of an idempotency key for another provider', function (): void
         identityUserId: $user->getKey(),
         provider: PaymentProvider::Stripe,
         idempotencyKey: 'payment-request-1',
+        paymentMethodReference: 'pm_another',
     ));
 
     expect($action)->toThrow(PaymentIdempotencyConflict::class);
@@ -159,6 +160,7 @@ function paymentCommand(
         identityUserId: $identityUserId,
         provider: PaymentProvider::Fake,
         idempotencyKey: 'payment-request-1',
+        paymentMethodReference: 'fake_method',
     );
 }
 

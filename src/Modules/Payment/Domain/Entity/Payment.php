@@ -108,9 +108,10 @@ final class Payment
         $this->failureCode = null;
     }
 
-    public function capture(): void
+    public function capture(string $providerPaymentId): void
     {
         $this->transition(PaymentStatus::Authorized, PaymentStatus::Captured);
+        $this->providerPaymentId = $providerPaymentId;
     }
 
     public function fail(string $failureCode): void

@@ -14,12 +14,14 @@ final readonly class PaymentRequestHasher
     public function hash(
         PayableOrder $order,
         PaymentProvider $provider,
+        string $paymentMethodReference,
     ): string {
         return hash('sha256', json_encode([
             'amount' => $order->amount,
             'currency' => $order->currency,
             'order_id' => $order->orderId,
             'provider' => $provider->value,
+            'payment_method_reference' => $paymentMethodReference,
         ], JSON_THROW_ON_ERROR));
     }
 }

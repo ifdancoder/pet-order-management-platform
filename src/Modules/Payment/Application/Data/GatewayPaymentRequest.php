@@ -12,5 +12,6 @@ final readonly class GatewayPaymentRequest
         public int $amount,
         public string $currency,
         public string $idempotencyKey,
+        public string $paymentMethodReference,
     ) {}
 }

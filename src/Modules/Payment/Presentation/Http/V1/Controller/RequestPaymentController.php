@@ -25,6 +25,7 @@ final readonly class RequestPaymentController
             identityUserId: $request->attributes->getString('identity.user_id'),
             provider: $request->provider(),
             idempotencyKey: $request->idempotencyKey(),
+            paymentMethodReference: $request->paymentMethodReference(),
         ));
 
         return (new PaymentResource($payment))

@@ -16,5 +16,6 @@ final readonly class RequestPaymentCommand implements ICommand
         public string $identityUserId,
         public PaymentProvider $provider,
         public string $idempotencyKey,
+        public string $paymentMethodReference,
     ) {}
 }

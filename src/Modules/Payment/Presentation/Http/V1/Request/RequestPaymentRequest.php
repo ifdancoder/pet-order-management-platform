@@ -27,6 +27,7 @@ final class RequestPaymentRequest extends FormRequest
     {
         return [
             'provider' => ['required', Rule::enum(PaymentProvider::class)],
+            'payment_method_reference' => ['required', 'string', 'max:255'],
             'idempotency_key' => ['required', 'string', 'max:128'],
         ];
     }
@@ -39,5 +40,10 @@ final class RequestPaymentRequest extends FormRequest
     public function idempotencyKey(): string
     {
         return $this->string('idempotency_key')->toString();
+    }
+
+    public function paymentMethodReference(): string
+    {
+        return $this->string('payment_method_reference')->toString();
     }
 }

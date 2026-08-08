@@ -16,12 +16,12 @@ it('moves through authorization capture and refund', function (): void {
 
     $payment->authorize('provider-payment-1');
     expect($payment->status())->toBe(PaymentStatus::Authorized);
-    $payment->capture();
+    $payment->capture('provider-capture-1');
     expect($payment->status())->toBe(PaymentStatus::Captured);
     $payment->refund();
 
     expect($payment->status())->toBe(PaymentStatus::Refunded)
-        ->and($payment->providerPaymentId())->toBe('provider-payment-1');
+        ->and($payment->providerPaymentId())->toBe('provider-capture-1');
 });
 
 it('records a failure before capture', function (): void {
@@ -40,7 +40,7 @@ it('rejects refund before capture', function (): void {
 it('rejects failure after capture', function (): void {
     $payment = pendingPayment();
     $payment->authorize('provider-payment-1');
-    $payment->capture();
+    $payment->capture('provider-capture-1');
 
     $payment->fail('late_failure');
 })->throws(InvalidPaymentStatusTransition::class);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Payment\Infrastructure\Adapter\Out\Gateway;
 
 use LogicException;
+use Modules\Payment\Application\Exception\PaymentGatewayUnavailable;
 use Modules\Payment\Application\Port\Out\Gateway\IPaymentGateway;
 use Modules\Payment\Application\Port\Out\Gateway\IPaymentGatewayResolver;
 use Modules\Payment\Domain\Enum\PaymentProvider;
@@ -34,9 +35,6 @@ final class PaymentGatewayResolver implements IPaymentGatewayResolver
     public function resolve(PaymentProvider $provider): IPaymentGateway
     {
         return $this->gateways[$provider->value]
-            ?? throw new LogicException(sprintf(
-                'Payment gateway "%s" is not configured.',
-                $provider->value,
-            ));
+            ?? throw PaymentGatewayUnavailable::forProvider($provider);
     }
 }

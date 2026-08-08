@@ -19,6 +19,7 @@ use Modules\Identity\Domain\Exception\UserAlreadySuspended;
 use Modules\Identity\Domain\Exception\UserDisabled;
 use Modules\Identity\Domain\Exception\UserNotSuspended;
 use Modules\Identity\Presentation\Http\V1\Middleware\AuthenticateAccessToken;
+use Modules\Payment\Application\Exception\PaymentGatewayUnavailable;
 use Modules\Payment\Application\Exception\PaymentIdempotencyConflict;
 use Modules\Payment\Application\Exception\PaymentNotAllowed;
 
@@ -144,5 +145,14 @@ return Application::configure(basePath: dirname(__DIR__))
                     'message' => 'The idempotency key was already used for another payment request.',
                 ],
             ], 409),
+        );
+
+        $exceptions->render(
+            fn (PaymentGatewayUnavailable $exception) => response()->json([
+                'error' => [
+                    'code' => 'payment_gateway_unavailable',
+                    'message' => 'The payment provider is temporarily unavailable.',
+                ],
+            ], 503),
         );
     })->create();

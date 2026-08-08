@@ -26,6 +26,7 @@ it('creates a payment for the authenticated customer order', function (): void {
         ->withHeader('Idempotency-Key', 'http-payment-1')
         ->postJson(route('payments.requests.store', ['orderId' => $order->getKey()]), [
             'provider' => 'fake',
+            'payment_method_reference' => 'fake_method',
         ])
         ->assertCreated()
         ->assertJsonPath('data.order_id', $order->getKey())
@@ -41,6 +42,7 @@ it('returns the same payment for an HTTP retry', function (): void {
         ->withHeader('Idempotency-Key', 'http-payment-1')
         ->postJson(route('payments.requests.store', ['orderId' => $order->getKey()]), [
             'provider' => 'fake',
+            'payment_method_reference' => 'fake_method',
         ]);
 
     $firstPaymentId = $request()->assertCreated()->json('data.id');
@@ -56,12 +58,18 @@ it('requires authentication and an idempotency key', function (): void {
     [, $order] = paymentHttpRecords();
     $route = route('payments.requests.store', ['orderId' => $order->getKey()]);
 
-    $this->postJson($route, ['provider' => 'fake'])
+    $this->postJson($route, [
+        'provider' => 'fake',
+        'payment_method_reference' => 'fake_method',
+    ])
         ->assertUnauthorized()
         ->assertJsonPath('error.code', 'invalid_access_token');
 
     $this->withToken('access-token-'.UserModel::query()->valueOrFail('id'))
-        ->postJson($route, ['provider' => 'fake'])
+        ->postJson($route, [
+            'provider' => 'fake',
+            'payment_method_reference' => 'fake_method',
+        ])
         ->assertUnprocessable()
         ->assertJsonValidationErrors('idempotency_key');
 });
@@ -79,6 +87,7 @@ it('does not expose another customer order', function (): void {
         ->withHeader('Idempotency-Key', 'http-payment-1')
         ->postJson(route('payments.requests.store', ['orderId' => $order->getKey()]), [
             'provider' => 'fake',
+            'payment_method_reference' => 'fake_method',
         ])
         ->assertNotFound()
         ->assertExactJson([
@@ -96,9 +105,28 @@ it('rejects unsupported payment providers', function (): void {
         ->withHeader('Idempotency-Key', 'http-payment-1')
         ->postJson(route('payments.requests.store', ['orderId' => $order->getKey()]), [
             'provider' => 'cash',
+            'payment_method_reference' => 'fake_method',
         ])
         ->assertUnprocessable()
         ->assertJsonValidationErrors('provider');
+});
+
+it('reports a configured provider requirement without exposing configuration', function (): void {
+    [$user, $order] = paymentHttpRecords();
+
+    $this->withToken('access-token-'.$user->getKey())
+        ->withHeader('Idempotency-Key', 'http-payment-1')
+        ->postJson(route('payments.requests.store', ['orderId' => $order->getKey()]), [
+            'provider' => 'stripe',
+            'payment_method_reference' => 'pm_123',
+        ])
+        ->assertServiceUnavailable()
+        ->assertExactJson([
+            'error' => [
+                'code' => 'payment_gateway_unavailable',
+                'message' => 'The payment provider is temporarily unavailable.',
+            ],
+        ]);
 });
 
 /** @return array{UserModel, OrderModel} */
