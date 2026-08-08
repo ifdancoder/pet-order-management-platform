@@ -11,9 +11,13 @@ use Modules\Order\Application\Data\OrderItemData;
 use Modules\Order\Application\Exception\CheckoutIdempotencyConflict;
 use Modules\Order\Application\Exception\CheckoutRejected;
 use Modules\Order\Application\Port\Out\Persistence\IOrderRepository;
+use Modules\Order\Application\Query\GetOrder\GetOrderQuery;
 use Modules\Order\Domain\Entity\Order;
 use Modules\Order\Domain\ValueObject\OrderId;
+use Modules\Promotion\Domain\Enum\DiscountType;
+use Modules\Promotion\Infrastructure\Adapter\Out\Persistence\Eloquent\Model\PromotionModel;
 use Shared\Application\Bus\Command\ICommandBus;
+use Shared\Application\Bus\Query\IQueryBus;
 
 uses(LazilyRefreshDatabase::class);
 
@@ -60,6 +64,61 @@ it('returns the original result when the same request is retried', function (): 
         'id' => $inventoryItem->getKey(),
         'reserved' => 1,
     ]);
+});
+
+it('stores the applied promotion snapshot and discounted total', function (): void {
+    [$customer, $inventoryItem] = checkoutRecords();
+    PromotionModel::factory()->create([
+        'code' => 'SAVE20',
+        'discount_type' => DiscountType::Percentage->value,
+        'discount_value' => 2_000,
+        'currency' => 'USD',
+        'starts_at' => now()->subDay(),
+        'ends_at' => now()->addDay(),
+    ]);
+
+    $result = app(ICommandBus::class)->dispatch(checkoutCommand(
+        customerId: $customer->getKey(),
+        inventoryItemId: $inventoryItem->getKey(),
+        promotionCodes: ['SAVE20'],
+    ));
+    $order = app(IQueryBus::class)->ask(new GetOrderQuery($result->orderId));
+
+    expect($order->subtotal()->amount())->toBe(2500)
+        ->and($order->discount()->amount())->toBe(500)
+        ->and($order->total()->amount())->toBe(2000)
+        ->and($order->promotionCodes())->toBe(['SAVE20']);
+    $this->assertDatabaseHas('orders', [
+        'id' => $result->orderId,
+        'discount_amount' => 500,
+        'total_amount' => 2000,
+    ]);
+    $this->assertDatabaseHas('order_applied_promotions', [
+        'order_id' => $result->orderId,
+        'promotion_code' => 'SAVE20',
+    ]);
+});
+
+it('rejects an invalid promotion before reserving inventory', function (): void {
+    [$customer, $inventoryItem] = checkoutRecords();
+
+    $action = fn () => app(ICommandBus::class)->dispatch(checkoutCommand(
+        customerId: $customer->getKey(),
+        inventoryItemId: $inventoryItem->getKey(),
+        promotionCodes: ['UNKNOWN'],
+    ));
+
+    expect($action)->toThrow(
+        CheckoutRejected::class,
+        'One or more promotions cannot be applied.',
+    );
+    $this->assertDatabaseHas('inventory_items', [
+        'id' => $inventoryItem->getKey(),
+        'reserved' => 0,
+    ]);
+    $this->assertDatabaseCount('orders', 0);
+    $this->assertDatabaseCount('inventory_reservations', 0);
+    $this->assertDatabaseCount('order_checkouts', 0);
 });
 
 it('rejects reuse of an idempotency key with another request', function (): void {
@@ -148,10 +207,12 @@ function checkoutRecords(int $onHand = 1): array
     ];
 }
 
+/** @param list<string> $promotionCodes */
 function checkoutCommand(
     string $customerId,
     string $inventoryItemId,
     int $quantity = 1,
+    array $promotionCodes = [],
 ): CheckoutCommand {
     return new CheckoutCommand(
         idempotencyKey: 'checkout-request-1',
@@ -165,5 +226,6 @@ function checkoutCommand(
                 unitPriceAmount: 2500,
             ),
         ],
+        promotionCodes: $promotionCodes,
     );
 }

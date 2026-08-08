@@ -24,6 +24,7 @@ final class OrderModel extends Model
         'customer_id',
         'currency',
         'status',
+        'discount_amount',
         'total_amount',
     ];
 
@@ -31,6 +32,7 @@ final class OrderModel extends Model
     {
         return [
             'total_amount' => 'integer',
+            'discount_amount' => 'integer',
         ];
     }
 

@@ -19,6 +19,7 @@ use Modules\Order\Application\Port\Out\Persistence\IOrderRepository;
 use Modules\Order\Domain\Entity\Order;
 use Modules\Order\Domain\ValueObject\CustomerId;
 use Shared\Application\Port\Out\Transaction\ITransactionManager;
+use Shared\Domain\ValueObject\Money;
 
 final readonly class CheckoutHandler
 {
@@ -39,6 +40,7 @@ final readonly class CheckoutHandler
             customerId: $command->customerId,
             currency: $command->currency,
             items: $command->items,
+            promotionCodes: $command->promotionCodes,
         );
         $requestHash = $this->requestHasher->hash($context);
 
@@ -58,6 +60,15 @@ final readonly class CheckoutHandler
             foreach ($context->items as $item) {
                 $order->addItem($item->toOrderItem($context->currency));
             }
+
+            $promotionQuote = $context->promotionQuote();
+            $order->applyPromotionDiscount(
+                new Money(
+                    $promotionQuote->discountAmount,
+                    $promotionQuote->currency,
+                ),
+                $promotionQuote->appliedPromotionCodes,
+            );
 
             $reservationId = $this->inventory->reserve(
                 reservationKey: 'checkout:'.hash('sha256', $command->idempotencyKey),

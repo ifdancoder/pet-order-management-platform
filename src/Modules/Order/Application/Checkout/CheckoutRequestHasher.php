@@ -30,6 +30,7 @@ final readonly class CheckoutRequestHasher
             'currency' => $context->currency,
             'customer_id' => $context->customerId,
             'items' => $items,
+            'promotion_codes' => $context->promotionCodes,
         ], JSON_THROW_ON_ERROR));
     }
 }

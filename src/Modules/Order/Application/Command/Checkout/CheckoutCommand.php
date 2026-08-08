@@ -11,11 +11,15 @@ use Shared\Application\Bus\Command\ICommand;
 /** @implements ICommand<CheckoutResult> */
 final readonly class CheckoutCommand implements ICommand
 {
-    /** @param list<OrderItemData> $items */
+    /**
+     * @param  list<OrderItemData>  $items
+     * @param  list<string>  $promotionCodes
+     */
     public function __construct(
         public string $idempotencyKey,
         public string $customerId,
         public string $currency,
         public array $items,
+        public array $promotionCodes = [],
     ) {}
 }

@@ -7,6 +7,7 @@ use Modules\Order\Domain\Entity\OrderItem;
 use Modules\Order\Domain\Enum\OrderStatus;
 use Modules\Order\Domain\Exception\EmptyOrder;
 use Modules\Order\Domain\Exception\InvalidOrderStatusTransition;
+use Modules\Order\Domain\Exception\InvalidPromotionDiscount;
 use Modules\Order\Domain\ValueObject\CustomerId;
 use Modules\Order\Domain\ValueObject\InventoryItemId;
 use Modules\Order\Domain\ValueObject\OrderId;
@@ -110,3 +111,28 @@ it('allows cancellation only before processing', function () {
 it('rejects item prices in another currency', function () {
     draftOrder()->addItem(orderItem(currency: 'EUR'));
 })->throws(CurrencyMismatch::class);
+
+it('applies a promotion discount to the order total', function () {
+    $order = draftOrder();
+    $order->addItem(orderItem());
+
+    $order->applyPromotionDiscount(
+        new Money(500, 'USD'),
+        ['SAVE20'],
+    );
+
+    expect($order->subtotal()->amount())->toBe(2500)
+        ->and($order->discount()->amount())->toBe(500)
+        ->and($order->total()->amount())->toBe(2000)
+        ->and($order->promotionCodes())->toBe(['SAVE20']);
+});
+
+it('rejects a promotion discount above the subtotal', function () {
+    $order = draftOrder();
+    $order->addItem(orderItem());
+
+    $order->applyPromotionDiscount(
+        new Money(2501, 'USD'),
+        ['TOO-MUCH'],
+    );
+})->throws(InvalidPromotionDiscount::class);

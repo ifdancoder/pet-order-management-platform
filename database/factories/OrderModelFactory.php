@@ -22,6 +22,7 @@ final class OrderModelFactory extends Factory
             'customer_id' => Str::uuid7()->toString(),
             'currency' => 'USD',
             'status' => OrderStatus::Draft->value,
+            'discount_amount' => 0,
             'total_amount' => 0,
         ];
     }

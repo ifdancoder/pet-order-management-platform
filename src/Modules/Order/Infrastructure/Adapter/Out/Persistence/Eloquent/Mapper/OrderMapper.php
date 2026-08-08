@@ -18,10 +18,14 @@ use Shared\Domain\ValueObject\Money;
 
 final class OrderMapper
 {
-    /** @param Collection<int, OrderItemModel> $itemModels */
+    /**
+     * @param  Collection<int, OrderItemModel>  $itemModels
+     * @param  list<string>  $promotionCodes
+     */
     public function toDomain(
         OrderModel $orderModel,
         Collection $itemModels,
+        array $promotionCodes = [],
     ): Order {
         return new Order(
             id: new OrderId($orderModel->id),
@@ -39,6 +43,11 @@ final class OrderMapper
                     ),
                 ),
             )->all()),
+            discount: new Money(
+                $orderModel->discount_amount,
+                $orderModel->currency,
+            ),
+            promotionCodes: $promotionCodes,
         );
     }
 
@@ -48,6 +57,7 @@ final class OrderMapper
         $model->customer_id = $order->customerId()->value();
         $model->currency = $order->currency();
         $model->status = $order->status()->value;
+        $model->discount_amount = $order->discount()->amount();
         $model->total_amount = $order->total()->amount();
     }
 }

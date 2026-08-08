@@ -39,6 +39,14 @@ final class CheckoutRejected extends RuntimeException
         );
     }
 
+    public static function promotionInvalid(): self
+    {
+        return new self(
+            reason: 'promotion_invalid',
+            message: 'One or more promotions cannot be applied.',
+        );
+    }
+
     public function reason(): string
     {
         return $this->reason;

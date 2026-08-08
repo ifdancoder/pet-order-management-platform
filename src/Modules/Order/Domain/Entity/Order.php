@@ -7,6 +7,7 @@ namespace Modules\Order\Domain\Entity;
 use Modules\Order\Domain\Enum\OrderStatus;
 use Modules\Order\Domain\Exception\EmptyOrder;
 use Modules\Order\Domain\Exception\InvalidOrderStatusTransition;
+use Modules\Order\Domain\Exception\InvalidPromotionDiscount;
 use Modules\Order\Domain\Exception\OrderItemAlreadyExists;
 use Modules\Order\Domain\Exception\OrderItemNotFound;
 use Modules\Order\Domain\ValueObject\CustomerId;
@@ -19,19 +20,33 @@ final class Order
     /** @var array<non-empty-string, OrderItem> */
     private array $items = [];
 
-    /** @param list<OrderItem> $items */
+    private Money $discount;
+
+    /** @var list<string> */
+    private array $promotionCodes;
+
+    /**
+     * @param  list<OrderItem>  $items
+     * @param  list<string>  $promotionCodes
+     */
     public function __construct(
         private readonly OrderId $id,
         private readonly CustomerId $customerId,
         private readonly string $currency,
         private OrderStatus $status,
         array $items = [],
+        ?Money $discount = null,
+        array $promotionCodes = [],
     ) {
         Money::zero($currency);
 
         foreach ($items as $item) {
             $this->addHydratedItem($item);
         }
+
+        $this->discount = $discount ?? Money::zero($currency);
+        $this->promotionCodes = [];
+        $this->setPromotionDiscount($this->discount, $promotionCodes);
     }
 
     public static function draft(
@@ -75,6 +90,11 @@ final class Order
 
     public function total(): Money
     {
+        return $this->subtotal()->subtract($this->discount);
+    }
+
+    public function subtotal(): Money
+    {
         $total = Money::zero($this->currency);
 
         foreach ($this->items as $item) {
@@ -82,6 +102,26 @@ final class Order
         }
 
         return $total;
+    }
+
+    public function discount(): Money
+    {
+        return $this->discount;
+    }
+
+    /** @return list<string> */
+    public function promotionCodes(): array
+    {
+        return $this->promotionCodes;
+    }
+
+    /** @param list<string> $promotionCodes */
+    public function applyPromotionDiscount(
+        Money $discount,
+        array $promotionCodes,
+    ): void {
+        $this->guardStatus(OrderStatus::Draft);
+        $this->setPromotionDiscount($discount, $promotionCodes);
     }
 
     public function addItem(OrderItem $item): void
@@ -173,6 +213,35 @@ final class Order
         }
 
         $this->items[$inventoryItemId] = $item;
+    }
+
+    /** @param list<string> $promotionCodes */
+    private function setPromotionDiscount(
+        Money $discount,
+        array $promotionCodes,
+    ): void {
+        if ($discount->amount() > 0 && $promotionCodes === []) {
+            throw InvalidPromotionDiscount::missingPromotionCode();
+        }
+
+        if ($discount->minimum($this->subtotal())->amount() !== $discount->amount()) {
+            throw InvalidPromotionDiscount::exceedsSubtotal();
+        }
+
+        $uniqueCodes = [];
+
+        foreach ($promotionCodes as $promotionCode) {
+            if (isset($uniqueCodes[$promotionCode])) {
+                throw InvalidPromotionDiscount::duplicatePromotionCode(
+                    $promotionCode,
+                );
+            }
+
+            $uniqueCodes[$promotionCode] = true;
+        }
+
+        $this->discount = $discount;
+        $this->promotionCodes = $promotionCodes;
     }
 
     private function transition(

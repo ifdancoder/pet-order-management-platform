@@ -8,6 +8,7 @@ use Modules\Order\Application\Port\Out\Persistence\IOrderRepository;
 use Modules\Order\Domain\Entity\Order;
 use Modules\Order\Domain\ValueObject\OrderId;
 use Modules\Order\Infrastructure\Adapter\Out\Persistence\Eloquent\Mapper\OrderMapper;
+use Modules\Order\Infrastructure\Adapter\Out\Persistence\Eloquent\Model\AppliedPromotionModel;
 use Modules\Order\Infrastructure\Adapter\Out\Persistence\Eloquent\Model\OrderItemModel;
 use Modules\Order\Infrastructure\Adapter\Out\Persistence\Eloquent\Model\OrderModel;
 
@@ -50,6 +51,17 @@ final readonly class EloquentOrderRepository implements IOrderRepository
         }
 
         $obsoleteItems->delete();
+
+        AppliedPromotionModel::query()
+            ->where('order_id', $order->id()->value())
+            ->delete();
+
+        foreach ($order->promotionCodes() as $promotionCode) {
+            AppliedPromotionModel::query()->create([
+                'order_id' => $order->id()->value(),
+                'promotion_code' => $promotionCode,
+            ]);
+        }
     }
 
     public function findById(OrderId $orderId): ?Order
@@ -75,7 +87,16 @@ final readonly class EloquentOrderRepository implements IOrderRepository
             ->where('order_id', $model->id)
             ->orderBy('inventory_item_id')
             ->get();
+        $promotionCodes = AppliedPromotionModel::query()
+            ->where('order_id', $model->id)
+            ->orderBy('promotion_code')
+            ->pluck('promotion_code')
+            ->all();
 
-        return $this->mapper->toDomain($model, $items);
+        return $this->mapper->toDomain(
+            $model,
+            $items,
+            array_values($promotionCodes),
+        );
     }
 }
