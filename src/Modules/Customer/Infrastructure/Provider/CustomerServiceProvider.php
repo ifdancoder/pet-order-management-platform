@@ -19,7 +19,9 @@ use Modules\Customer\Application\Command\UpdateAddress\UpdateAddressCommand;
 use Modules\Customer\Application\Command\UpdateAddress\UpdateAddressHandler;
 use Modules\Customer\Application\Command\UpdateCustomer\UpdateCustomerCommand;
 use Modules\Customer\Application\Command\UpdateCustomer\UpdateCustomerHandler;
+use Modules\Customer\Application\Identity\CustomerIdentityLookup;
 use Modules\Customer\Application\Port\In\ICustomerCheckout;
+use Modules\Customer\Application\Port\In\ICustomerIdentityLookup;
 use Modules\Customer\Application\Port\Out\Identity\IAddressIdGenerator;
 use Modules\Customer\Application\Port\Out\Identity\ICustomerIdGenerator;
 use Modules\Customer\Application\Port\Out\Persistence\ICustomerRepository;
@@ -40,6 +42,7 @@ final class CustomerServiceProvider extends ServiceProvider
         $this->app->bind(ICustomerIdGenerator::class, LaravelCustomerIdGenerator::class);
         $this->app->bind(IAddressIdGenerator::class, LaravelAddressIdGenerator::class);
         $this->app->bind(ICustomerCheckout::class, CustomerCheckout::class);
+        $this->app->bind(ICustomerIdentityLookup::class, CustomerIdentityLookup::class);
     }
 
     public function boot(): void

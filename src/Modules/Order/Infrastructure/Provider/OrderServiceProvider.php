@@ -22,6 +22,8 @@ use Modules\Order\Application\Command\RemoveOrderItem\RemoveOrderItemCommand;
 use Modules\Order\Application\Command\RemoveOrderItem\RemoveOrderItemHandler;
 use Modules\Order\Application\Command\TransitionOrder\TransitionOrderCommand;
 use Modules\Order\Application\Command\TransitionOrder\TransitionOrderHandler;
+use Modules\Order\Application\Payment\OrderPayment;
+use Modules\Order\Application\Port\In\IOrderPayment;
 use Modules\Order\Application\Port\Out\Checkout\ICustomerCheckoutGateway;
 use Modules\Order\Application\Port\Out\Checkout\IInventoryCheckoutGateway;
 use Modules\Order\Application\Port\Out\Checkout\IPromotionCheckoutGateway;
@@ -48,6 +50,7 @@ final class OrderServiceProvider extends ServiceProvider
         $this->app->bind(ICustomerCheckoutGateway::class, CustomerCheckoutGateway::class);
         $this->app->bind(IInventoryCheckoutGateway::class, InventoryCheckoutGateway::class);
         $this->app->bind(IPromotionCheckoutGateway::class, PromotionCheckoutGateway::class);
+        $this->app->bind(IOrderPayment::class, OrderPayment::class);
         $this->app->tag([
             CustomerCanOrderRule::class,
             OrderNotEmptyRule::class,
