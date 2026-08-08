@@ -23,6 +23,9 @@ services:
       DB_USERNAME: orderflow
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PASSWORD: orderflow
+      RABBITMQ_USER: orderflow
       SESSION_DRIVER: redis
     ports:
       - "${APP_PORT:-8000}:8000"
@@ -42,6 +45,65 @@ services:
       timeout: 3s
       retries: 12
       start_period: 30s
+    restart: unless-stopped
+
+  queue-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: php artisan queue:work database --queue=outbox,default --sleep=1 --tries=1 --timeout=20 --max-time=3600
+    environment:
+      APP_ENV: local
+      CACHE_STORE: redis
+      DB_CONNECTION: pgsql
+      DB_DATABASE: orderflow
+      DB_HOST: postgres
+      DB_PASSWORD: orderflow
+      DB_PORT: 5432
+      DB_USERNAME: orderflow
+      QUEUE_CONNECTION: database
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PASSWORD: orderflow
+      RABBITMQ_USER: orderflow
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    volumes:
+      - .:/var/www/html
+      - composer_vendor:/var/www/html/vendor
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: php artisan schedule:work
+    environment:
+      APP_ENV: local
+      CACHE_STORE: redis
+      DB_CONNECTION: pgsql
+      DB_DATABASE: orderflow
+      DB_HOST: postgres
+      DB_PASSWORD: orderflow
+      DB_PORT: 5432
+      DB_USERNAME: orderflow
+      QUEUE_CONNECTION: database
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    volumes:
+      - .:/var/www/html
+      - composer_vendor:/var/www/html/vendor
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
   postgres:
