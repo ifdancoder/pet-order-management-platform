@@ -19,6 +19,8 @@ use Modules\Identity\Domain\Exception\UserAlreadySuspended;
 use Modules\Identity\Domain\Exception\UserDisabled;
 use Modules\Identity\Domain\Exception\UserNotSuspended;
 use Modules\Identity\Presentation\Http\V1\Middleware\AuthenticateAccessToken;
+use Modules\Payment\Application\Exception\PaymentIdempotencyConflict;
+use Modules\Payment\Application\Exception\PaymentNotAllowed;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -122,6 +124,24 @@ return Application::configure(basePath: dirname(__DIR__))
                 'error' => [
                     'code' => 'customer_archived',
                     'message' => $exception->getMessage(),
+                ],
+            ], 409),
+        );
+
+        $exceptions->render(
+            fn (PaymentNotAllowed $exception) => response()->json([
+                'error' => [
+                    'code' => 'payment_not_allowed',
+                    'message' => 'The order cannot be paid.',
+                ],
+            ], 404),
+        );
+
+        $exceptions->render(
+            fn (PaymentIdempotencyConflict $exception) => response()->json([
+                'error' => [
+                    'code' => 'payment_idempotency_conflict',
+                    'message' => 'The idempotency key was already used for another payment request.',
                 ],
             ], 409),
         );

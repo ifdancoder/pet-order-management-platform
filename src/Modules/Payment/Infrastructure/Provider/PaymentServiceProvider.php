@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Payment\Infrastructure\Provider;
 
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use LogicException;
 use Modules\Payment\Application\Command\RequestPayment\RequestPaymentCommand;
@@ -59,5 +63,17 @@ final class PaymentServiceProvider extends ServiceProvider
             RequestPaymentCommand::class,
             RequestPaymentHandler::class,
         );
+
+        RateLimiter::for(
+            'payment-request',
+            fn (Request $request): Limit => Limit::perMinute(10)->by(
+                $request->attributes->getString('identity.user_id').'|'.$request->ip(),
+            ),
+        );
+
+        Route::middleware('api')
+            ->prefix('api/v1/orders')
+            ->name('payments.')
+            ->group(dirname(__DIR__, 2).'/Presentation/Http/V1/Routes/payment_routes.php');
     }
 }
