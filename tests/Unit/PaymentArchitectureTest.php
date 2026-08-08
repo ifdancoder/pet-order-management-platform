@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Modules\Payment\Application\Command\ProcessPaymentWebhook\ProcessPaymentWebhookCommand;
 use Modules\Payment\Application\Command\RequestPayment\RequestPaymentCommand;
 use Shared\Application\Bus\Command\ICommand;
 
@@ -41,6 +42,9 @@ arch('payment application ports use the interface prefix')
     ->toHavePrefix('I');
 
 arch('payment commands declare their result contract')
-    ->expect([RequestPaymentCommand::class])
+    ->expect([
+        ProcessPaymentWebhookCommand::class,
+        RequestPaymentCommand::class,
+    ])
     ->classes()
     ->toImplement(ICommand::class);

@@ -19,9 +19,11 @@ use Modules\Identity\Domain\Exception\UserAlreadySuspended;
 use Modules\Identity\Domain\Exception\UserDisabled;
 use Modules\Identity\Domain\Exception\UserNotSuspended;
 use Modules\Identity\Presentation\Http\V1\Middleware\AuthenticateAccessToken;
+use Modules\Payment\Application\Exception\InvalidPaymentWebhook;
 use Modules\Payment\Application\Exception\PaymentGatewayUnavailable;
 use Modules\Payment\Application\Exception\PaymentIdempotencyConflict;
 use Modules\Payment\Application\Exception\PaymentNotAllowed;
+use Modules\Payment\Application\Exception\PaymentNotFound;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -154,5 +156,23 @@ return Application::configure(basePath: dirname(__DIR__))
                     'message' => 'The payment provider is temporarily unavailable.',
                 ],
             ], 503),
+        );
+
+        $exceptions->render(
+            fn (InvalidPaymentWebhook $exception) => response()->json([
+                'error' => [
+                    'code' => 'invalid_payment_webhook',
+                    'message' => 'Payment webhook is invalid.',
+                ],
+            ], 400),
+        );
+
+        $exceptions->render(
+            fn (PaymentNotFound $exception) => response()->json([
+                'error' => [
+                    'code' => 'payment_not_found',
+                    'message' => 'Payment was not found.',
+                ],
+            ], 404),
         );
     })->create();

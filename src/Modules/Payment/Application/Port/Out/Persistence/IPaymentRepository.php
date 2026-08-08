@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Payment\Application\Port\Out\Persistence;
 
 use Modules\Payment\Domain\Entity\Payment;
+use Modules\Payment\Domain\Enum\PaymentProvider;
 use Modules\Payment\Domain\ValueObject\IdempotencyKey;
 use Modules\Payment\Domain\ValueObject\PaymentId;
 
@@ -19,6 +20,7 @@ interface IPaymentRepository
     public function findByIdForUpdate(PaymentId $paymentId): ?Payment;
 
     public function findByProviderPaymentIdForUpdate(
+        PaymentProvider $provider,
         string $providerPaymentId,
     ): ?Payment;
 }

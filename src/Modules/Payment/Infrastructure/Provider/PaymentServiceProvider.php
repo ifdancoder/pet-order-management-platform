@@ -13,12 +13,16 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use LogicException;
+use Modules\Payment\Application\Command\ProcessPaymentWebhook\ProcessPaymentWebhookCommand;
+use Modules\Payment\Application\Command\ProcessPaymentWebhook\ProcessPaymentWebhookHandler;
 use Modules\Payment\Application\Command\RequestPayment\RequestPaymentCommand;
 use Modules\Payment\Application\Command\RequestPayment\RequestPaymentHandler;
 use Modules\Payment\Application\Port\Out\Gateway\IPaymentGatewayResolver;
 use Modules\Payment\Application\Port\Out\Identity\IPaymentIdGenerator;
 use Modules\Payment\Application\Port\Out\Order\IOrderPaymentGateway;
 use Modules\Payment\Application\Port\Out\Persistence\IPaymentRepository;
+use Modules\Payment\Application\Port\Out\Persistence\IProcessedPaymentWebhookRepository;
+use Modules\Payment\Application\Port\Out\Webhook\IPaymentWebhookVerifierResolver;
 use Modules\Payment\Infrastructure\Adapter\Out\Gateway\FakePaymentGateway;
 use Modules\Payment\Infrastructure\Adapter\Out\Gateway\PaymentGatewayResolver;
 use Modules\Payment\Infrastructure\Adapter\Out\Gateway\PayPalPaymentGateway;
@@ -26,6 +30,10 @@ use Modules\Payment\Infrastructure\Adapter\Out\Gateway\StripePaymentGateway;
 use Modules\Payment\Infrastructure\Adapter\Out\Identity\LaravelPaymentIdGenerator;
 use Modules\Payment\Infrastructure\Adapter\Out\Order\OrderPaymentGateway;
 use Modules\Payment\Infrastructure\Adapter\Out\Persistence\Eloquent\Repository\EloquentPaymentRepository;
+use Modules\Payment\Infrastructure\Adapter\Out\Persistence\LaravelProcessedPaymentWebhookRepository;
+use Modules\Payment\Infrastructure\Adapter\Out\Webhook\PaymentWebhookVerifierResolver;
+use Modules\Payment\Infrastructure\Adapter\Out\Webhook\PayPalPaymentWebhookVerifier;
+use Modules\Payment\Infrastructure\Adapter\Out\Webhook\StripePaymentWebhookVerifier;
 use Shared\Infrastructure\Bus\HandlerRegistry;
 
 final class PaymentServiceProvider extends ServiceProvider
@@ -34,6 +42,10 @@ final class PaymentServiceProvider extends ServiceProvider
     {
         $config = $this->app->make(ConfigRepository::class);
         $this->app->bind(IPaymentRepository::class, EloquentPaymentRepository::class);
+        $this->app->bind(
+            IProcessedPaymentWebhookRepository::class,
+            LaravelProcessedPaymentWebhookRepository::class,
+        );
         $this->app->bind(IPaymentIdGenerator::class, LaravelPaymentIdGenerator::class);
         $this->app->bind(IOrderPaymentGateway::class, OrderPaymentGateway::class);
         $this->app->singleton(
@@ -97,13 +109,64 @@ final class PaymentServiceProvider extends ServiceProvider
                 $this->app->tagged('payment.gateways'),
             ),
         );
+
+        $webhookVerifierClasses = [];
+        $stripeWebhookSecret = $config->get('payment.stripe.webhook_secret');
+        $stripeWebhookTolerance = $config->get(
+            'payment.stripe.webhook_tolerance_seconds',
+        );
+
+        if (
+            is_string($stripeWebhookSecret) && $stripeWebhookSecret !== ''
+            && is_int($stripeWebhookTolerance) && $stripeWebhookTolerance > 0
+        ) {
+            $this->app->singleton(
+                StripePaymentWebhookVerifier::class,
+                fn (): StripePaymentWebhookVerifier => new StripePaymentWebhookVerifier(
+                    signingSecret: $stripeWebhookSecret,
+                    toleranceSeconds: $stripeWebhookTolerance,
+                ),
+            );
+            $webhookVerifierClasses[] = StripePaymentWebhookVerifier::class;
+        }
+
+        $payPalWebhookId = $config->get('payment.paypal.webhook_id');
+
+        if (
+            is_string($payPalClientId) && $payPalClientId !== ''
+            && is_string($payPalClientSecret) && $payPalClientSecret !== ''
+            && is_string($payPalBaseUrl) && $payPalBaseUrl !== ''
+            && is_string($payPalWebhookId) && $payPalWebhookId !== ''
+        ) {
+            $this->app->singleton(
+                PayPalPaymentWebhookVerifier::class,
+                fn (Application $application): PayPalPaymentWebhookVerifier => new PayPalPaymentWebhookVerifier(
+                    http: $application->make(HttpFactory::class),
+                    clientId: $payPalClientId,
+                    clientSecret: $payPalClientSecret,
+                    baseUrl: rtrim($payPalBaseUrl, '/'),
+                    webhookId: $payPalWebhookId,
+                ),
+            );
+            $webhookVerifierClasses[] = PayPalPaymentWebhookVerifier::class;
+        }
+
+        $this->app->tag($webhookVerifierClasses, 'payment.webhook-verifiers');
+        $this->app->singleton(
+            IPaymentWebhookVerifierResolver::class,
+            fn (): PaymentWebhookVerifierResolver => new PaymentWebhookVerifierResolver(
+                $this->app->tagged('payment.webhook-verifiers'),
+            ),
+        );
     }
 
     public function boot(): void
     {
-        $this->app->make(HandlerRegistry::class)->register(
-            RequestPaymentCommand::class,
-            RequestPaymentHandler::class,
+        $handlers = $this->app->make(HandlerRegistry::class);
+        $handlers->register(RequestPaymentCommand::class, RequestPaymentHandler::class);
+        $handlers->register(
+            ProcessPaymentWebhookCommand::class,
+            ProcessPaymentWebhookHandler::class,
         );
 
         RateLimiter::for(
@@ -113,9 +176,21 @@ final class PaymentServiceProvider extends ServiceProvider
             ),
         );
 
+        RateLimiter::for(
+            'payment-webhook',
+            fn (Request $request): Limit => Limit::perMinute(120)->by(
+                $request->route('provider').'|'.$request->ip(),
+            ),
+        );
+
         Route::middleware('api')
             ->prefix('api/v1/orders')
             ->name('payments.')
             ->group(dirname(__DIR__, 2).'/Presentation/Http/V1/Routes/payment_routes.php');
+
+        Route::middleware('api')
+            ->prefix('api/v1/payments')
+            ->name('payment-webhooks.')
+            ->group(dirname(__DIR__, 2).'/Presentation/Http/V1/Routes/webhook_routes.php');
     }
 }

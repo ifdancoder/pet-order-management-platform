@@ -6,6 +6,7 @@ namespace Modules\Payment\Infrastructure\Adapter\Out\Persistence\Eloquent\Reposi
 
 use Modules\Payment\Application\Port\Out\Persistence\IPaymentRepository;
 use Modules\Payment\Domain\Entity\Payment;
+use Modules\Payment\Domain\Enum\PaymentProvider;
 use Modules\Payment\Domain\ValueObject\IdempotencyKey;
 use Modules\Payment\Domain\ValueObject\PaymentId;
 use Modules\Payment\Infrastructure\Adapter\Out\Persistence\Eloquent\Mapper\PaymentMapper;
@@ -52,9 +53,11 @@ final readonly class EloquentPaymentRepository implements IPaymentRepository
     }
 
     public function findByProviderPaymentIdForUpdate(
+        PaymentProvider $provider,
         string $providerPaymentId,
     ): ?Payment {
         $model = PaymentModel::query()
+            ->where('provider', $provider->value)
             ->where('provider_payment_id', $providerPaymentId)
             ->lockForUpdate()
             ->first();
