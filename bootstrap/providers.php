@@ -8,12 +8,14 @@ use Modules\Order\Infrastructure\Provider\OrderServiceProvider;
 use Modules\Payment\Infrastructure\Provider\PaymentServiceProvider;
 use Modules\Promotion\Infrastructure\Provider\PromotionServiceProvider;
 use Shared\Infrastructure\Provider\BusServiceProvider;
+use Shared\Infrastructure\Provider\OutboxServiceProvider;
 use Shared\Infrastructure\Provider\TransactionServiceProvider;
 
 return [
     AppServiceProvider::class,
     BusServiceProvider::class,
     TransactionServiceProvider::class,
+    OutboxServiceProvider::class,
     IdentityServiceProvider::class,
     CustomerServiceProvider::class,
     InventoryServiceProvider::class,

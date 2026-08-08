@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Payment\Application\Command\ProcessPaymentWebhook;
 
 use Modules\Payment\Application\Data\VerifiedPaymentWebhook;
+use Modules\Payment\Application\Event\PaymentIntegrationEvent;
 use Modules\Payment\Application\Exception\InvalidPaymentWebhook;
 use Modules\Payment\Application\Exception\PaymentNotFound;
 use Modules\Payment\Application\Port\Out\Persistence\IPaymentRepository;
@@ -13,6 +14,7 @@ use Modules\Payment\Application\Port\Out\Webhook\IPaymentWebhookVerifierResolver
 use Modules\Payment\Domain\Entity\Payment;
 use Modules\Payment\Domain\Enum\PaymentStatus;
 use Modules\Payment\Domain\Exception\InvalidPaymentStatusTransition;
+use Shared\Application\Port\Out\Outbox\IOutboxWriter;
 use Shared\Application\Port\Out\Transaction\ITransactionManager;
 
 final readonly class ProcessPaymentWebhookHandler
@@ -22,6 +24,7 @@ final readonly class ProcessPaymentWebhookHandler
         private IPaymentRepository $payments,
         private IProcessedPaymentWebhookRepository $processedWebhooks,
         private ITransactionManager $transaction,
+        private IOutboxWriter $outbox,
     ) {}
 
     public function __invoke(ProcessPaymentWebhookCommand $command): null
@@ -41,25 +44,30 @@ final readonly class ProcessPaymentWebhookHandler
             ) ?? throw PaymentNotFound::withId($event->lookupProviderPaymentId);
 
             try {
-                $this->apply($payment, $event);
+                $changed = $this->apply($payment, $event);
             } catch (InvalidPaymentStatusTransition $exception) {
                 throw InvalidPaymentWebhook::create($exception);
             }
 
-            $this->payments->save($payment);
+            if ($changed) {
+                $this->payments->save($payment);
+                $this->outbox->record(
+                    PaymentIntegrationEvent::fromPayment($payment),
+                );
+            }
         });
 
         return null;
     }
 
-    private function apply(Payment $payment, VerifiedPaymentWebhook $event): void
+    private function apply(Payment $payment, VerifiedPaymentWebhook $event): bool
     {
         if ($payment->provider() !== $event->provider) {
             throw InvalidPaymentWebhook::create();
         }
 
         if ($payment->status() === $event->status) {
-            return;
+            return false;
         }
 
         match ($event->status) {
@@ -71,5 +79,7 @@ final readonly class ProcessPaymentWebhookHandler
             PaymentStatus::Refunded => $payment->refund(),
             PaymentStatus::Pending => throw InvalidPaymentWebhook::create(),
         };
+
+        return true;
     }
 }

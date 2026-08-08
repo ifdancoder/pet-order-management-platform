@@ -6,6 +6,7 @@ namespace Modules\Payment\Application\Command\RequestPayment;
 
 use Modules\Payment\Application\Data\GatewayPaymentRequest;
 use Modules\Payment\Application\Data\GatewayPaymentResult;
+use Modules\Payment\Application\Event\PaymentIntegrationEvent;
 use Modules\Payment\Application\Exception\PaymentIdempotencyConflict;
 use Modules\Payment\Application\Exception\PaymentNotAllowed;
 use Modules\Payment\Application\Exception\PaymentNotFound;
@@ -17,6 +18,7 @@ use Modules\Payment\Domain\Entity\Payment;
 use Modules\Payment\Domain\Enum\PaymentStatus;
 use Modules\Payment\Domain\ValueObject\IdempotencyKey;
 use Modules\Payment\Domain\ValueObject\OrderId;
+use Shared\Application\Port\Out\Outbox\IOutboxWriter;
 use Shared\Application\Port\Out\Transaction\ITransactionManager;
 use Shared\Domain\ValueObject\Money;
 
@@ -29,6 +31,7 @@ final readonly class RequestPaymentHandler
         private IPaymentGatewayResolver $gateways,
         private PaymentRequestHasher $requestHasher,
         private ITransactionManager $transaction,
+        private IOutboxWriter $outbox,
     ) {}
 
     public function __invoke(RequestPaymentCommand $command): Payment
@@ -109,6 +112,9 @@ final readonly class RequestPaymentHandler
             }
 
             $this->payments->save($lockedPayment);
+            $this->outbox->record(
+                PaymentIntegrationEvent::fromPayment($lockedPayment),
+            );
 
             return $lockedPayment;
         });

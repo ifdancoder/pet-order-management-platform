@@ -19,6 +19,8 @@ use Modules\Payment\Application\Port\Out\Gateway\IPaymentGatewayResolver;
 use Modules\Payment\Domain\Enum\PaymentProvider;
 use Modules\Payment\Domain\Enum\PaymentStatus;
 use Shared\Application\Bus\Command\ICommandBus;
+use Shared\Application\Event\IIntegrationEvent;
+use Shared\Application\Port\Out\Outbox\IOutboxWriter;
 
 uses(LazilyRefreshDatabase::class);
 
@@ -40,6 +42,11 @@ it('authorizes the payable order through the selected gateway', function (): voi
         'amount' => 2500,
         'currency' => 'USD',
     ]);
+    $this->assertDatabaseHas('outbox_messages', [
+        'event_name' => 'payment.authorized.v1',
+        'aggregate_id' => $payment->id()->value(),
+        'published_at' => null,
+    ]);
 });
 
 it('returns the same payment when a request is retried', function (): void {
@@ -56,6 +63,7 @@ it('returns the same payment when a request is retried', function (): void {
     expect($second->id()->value())->toBe($first->id()->value())
         ->and($second->providerPaymentId())->toBe($first->providerPaymentId());
     $this->assertDatabaseCount('payments', 1);
+    $this->assertDatabaseCount('outbox_messages', 1);
 });
 
 it('rejects reuse of an idempotency key for another provider', function (): void {
@@ -94,6 +102,27 @@ it('records a declined authorization', function (): void {
         'status' => PaymentStatus::Failed->value,
         'failure_code' => 'payment_declined',
     ]);
+    $this->assertDatabaseHas('outbox_messages', [
+        'event_name' => 'payment.failed.v1',
+        'aggregate_id' => $payment->id()->value(),
+    ]);
+});
+
+it('rolls back the payment transition when its outbox write fails', function (): void {
+    [$user, $order] = paymentRecords();
+    app()->instance(IOutboxWriter::class, new FailingOutboxWriter);
+
+    $action = fn () => app(ICommandBus::class)->dispatch(paymentCommand(
+        orderId: $order->getKey(),
+        identityUserId: $user->getKey(),
+    ));
+
+    expect($action)->toThrow(RuntimeException::class, 'Outbox write failed.');
+    $this->assertDatabaseHas('payments', [
+        'order_id' => $order->getKey(),
+        'status' => PaymentStatus::Pending->value,
+    ]);
+    $this->assertDatabaseCount('outbox_messages', 0);
 });
 
 it('does not keep a database transaction open during gateway authorization', function (): void {
@@ -206,5 +235,13 @@ final readonly class TransactionObservingPaymentGatewayResolver implements IPaym
     public function resolve(PaymentProvider $provider): IPaymentGateway
     {
         return $this->gateway;
+    }
+}
+
+final readonly class FailingOutboxWriter implements IOutboxWriter
+{
+    public function record(IIntegrationEvent $event): void
+    {
+        throw new RuntimeException('Outbox write failed.');
     }
 }

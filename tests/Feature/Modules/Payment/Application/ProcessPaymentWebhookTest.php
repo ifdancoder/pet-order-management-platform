@@ -42,6 +42,11 @@ it('applies a payment webhook once when the same event is delivered twice', func
         'status' => PaymentStatus::Captured->value,
     ]);
     $this->assertDatabaseCount('processed_payment_webhooks', 1);
+    $this->assertDatabaseHas('outbox_messages', [
+        'event_name' => 'payment.captured.v1',
+        'aggregate_id' => $payment->getKey(),
+    ]);
+    $this->assertDatabaseCount('outbox_messages', 1);
 });
 
 it('changes the provider payment id when PayPal capture completes', function (): void {
@@ -72,6 +77,7 @@ it('changes the provider payment id when PayPal capture completes', function ():
         'provider_payment_id' => 'paypal-capture-1',
     ]);
     $this->assertDatabaseCount('processed_payment_webhooks', 1);
+    $this->assertDatabaseCount('outbox_messages', 1);
 });
 
 it('acknowledges a processed webhook through the HTTP adapter', function (): void {
