@@ -58,7 +58,13 @@ it('keeps registration committed when welcome email delivery fails', function ()
         password: 'plain-password',
     ));
     app(OutboxPublisher::class)->publishPending();
-    $consumer->consumeOne('notification-user-registered');
+    $consumed = $consumer->consumeOne('notification-user-registered');
+
+    expect($consumed)->toBeTrue();
+    $this->assertDatabaseHas('notification_deliveries', [
+        'recipient' => 'user@example.com',
+        'status' => NotificationStatus::Pending->value,
+    ]);
     $channel = new class implements INotificationChannel
     {
         public function channel(): NotificationChannel
