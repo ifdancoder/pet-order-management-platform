@@ -21,4 +21,15 @@ return [
         'heartbeat_seconds' => (int) env('RABBITMQ_HEARTBEAT_SECONDS', 3),
         'confirm_timeout_seconds' => (float) env('RABBITMQ_CONFIRM_TIMEOUT_SECONDS', 5),
     ],
+    'consumers' => [
+        'order-payment-status' => [
+            'queue' => env('RABBITMQ_ORDER_QUEUE', 'orderflow.order.payment-status'),
+            'bindings' => [
+                'payment.captured.v1',
+                'payment.failed.v1',
+            ],
+            'dead_letter_exchange' => env('RABBITMQ_DEAD_LETTER_EXCHANGE', 'orderflow.dead'),
+            'prefetch_count' => (int) env('RABBITMQ_CONSUMER_PREFETCH_COUNT', 10),
+        ],
+    ],
 ];
