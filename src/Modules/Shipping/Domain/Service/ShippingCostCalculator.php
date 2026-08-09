@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Shipping\Domain\Service;
 
-use Modules\Shipping\Domain\ValueObject\Shipment;
+use Modules\Shipping\Domain\ValueObject\ShippingRateRequest;
 use Shared\Domain\ValueObject\Money;
 
 final readonly class ShippingCostCalculator
@@ -13,7 +13,7 @@ final readonly class ShippingCostCalculator
         private ShippingStrategyResolver $strategies,
     ) {}
 
-    public function calculate(Shipment $shipment): Money
+    public function calculate(ShippingRateRequest $shipment): Money
     {
         return $this->strategies
             ->resolve($shipment->method())

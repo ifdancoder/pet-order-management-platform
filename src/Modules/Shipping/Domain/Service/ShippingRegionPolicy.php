@@ -6,7 +6,7 @@ namespace Modules\Shipping\Domain\Service;
 
 use InvalidArgumentException;
 use Modules\Shipping\Domain\Exception\ShippingMethodUnavailable;
-use Modules\Shipping\Domain\ValueObject\Shipment;
+use Modules\Shipping\Domain\ValueObject\ShippingRateRequest;
 
 final readonly class ShippingRegionPolicy
 {
@@ -20,21 +20,21 @@ final readonly class ShippingRegionPolicy
         }
     }
 
-    public function requireDomestic(Shipment $shipment): void
+    public function requireDomestic(ShippingRateRequest $shipment): void
     {
         if ($shipment->destination()->countryCode() !== $this->domesticCountryCode) {
             $this->unavailable($shipment);
         }
     }
 
-    public function requireInternational(Shipment $shipment): void
+    public function requireInternational(ShippingRateRequest $shipment): void
     {
         if ($shipment->destination()->countryCode() === $this->domesticCountryCode) {
             $this->unavailable($shipment);
         }
     }
 
-    private function unavailable(Shipment $shipment): never
+    private function unavailable(ShippingRateRequest $shipment): never
     {
         throw ShippingMethodUnavailable::forDestination(
             $shipment->method(),

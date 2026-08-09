@@ -14,8 +14,8 @@ use Modules\Shipping\Domain\Strategy\CourierShippingStrategy;
 use Modules\Shipping\Domain\Strategy\ExpressShippingStrategy;
 use Modules\Shipping\Domain\Strategy\InternationalShippingStrategy;
 use Modules\Shipping\Domain\Strategy\PickupPointShippingStrategy;
-use Modules\Shipping\Domain\ValueObject\Shipment;
 use Modules\Shipping\Domain\ValueObject\ShippingDestination;
+use Modules\Shipping\Domain\ValueObject\ShippingRateRequest;
 use Shared\Domain\ValueObject\Money;
 
 it('calculates each shipping method with its strategy', function (
@@ -117,8 +117,8 @@ function shipmentFor(
     ShippingMethod $method,
     string $countryCode,
     int $weightGrams = 1000,
-): Shipment {
-    return new Shipment(
+): ShippingRateRequest {
+    return new ShippingRateRequest(
         method: $method,
         destination: new ShippingDestination($countryCode, '10001'),
         weightGrams: $weightGrams,

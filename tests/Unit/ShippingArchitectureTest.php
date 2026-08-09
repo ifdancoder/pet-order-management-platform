@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use Modules\Shipping\Application\Command\CreateShipment\CreateShipmentCommand;
 use Modules\Shipping\Application\Query\CalculateShippingCost\CalculateShippingCostQuery;
+use Shared\Application\Bus\Command\ICommand;
 use Shared\Application\Bus\Query\IQuery;
 
 arch('shipping domain has no framework or outer-layer dependencies')
@@ -44,3 +46,8 @@ arch('shipping queries declare their result contract')
     ->expect([CalculateShippingCostQuery::class])
     ->classes()
     ->toImplement(IQuery::class);
+
+arch('shipping commands declare their result contract')
+    ->expect([CreateShipmentCommand::class])
+    ->classes()
+    ->toImplement(ICommand::class);

@@ -8,8 +8,8 @@ use Modules\Shipping\Application\Data\ShippingQuote;
 use Modules\Shipping\Application\Data\ShippingQuoteRequest;
 use Modules\Shipping\Application\Port\In\IShippingRateCalculator;
 use Modules\Shipping\Domain\Service\ShippingCostCalculator;
-use Modules\Shipping\Domain\ValueObject\Shipment;
 use Modules\Shipping\Domain\ValueObject\ShippingDestination;
+use Modules\Shipping\Domain\ValueObject\ShippingRateRequest;
 
 final readonly class ShippingRateCalculator implements IShippingRateCalculator
 {
@@ -19,7 +19,7 @@ final readonly class ShippingRateCalculator implements IShippingRateCalculator
 
     public function quote(ShippingQuoteRequest $request): ShippingQuote
     {
-        $cost = $this->costs->calculate(new Shipment(
+        $cost = $this->costs->calculate(new ShippingRateRequest(
             method: $request->method,
             destination: new ShippingDestination(
                 $request->countryCode,

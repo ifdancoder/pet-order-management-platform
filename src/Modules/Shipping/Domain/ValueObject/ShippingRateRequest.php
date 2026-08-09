@@ -7,7 +7,7 @@ namespace Modules\Shipping\Domain\ValueObject;
 use InvalidArgumentException;
 use Modules\Shipping\Domain\Enum\ShippingMethod;
 
-final readonly class Shipment
+final readonly class ShippingRateRequest
 {
     /** @var int<1, max> */
     private int $weightGrams;
