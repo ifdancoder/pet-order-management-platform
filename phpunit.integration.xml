@@ -31,6 +31,7 @@
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="RABBITMQ_ORDER_QUEUE" value="orderflow.test.order.payment-status" force="true"/>
+        <env name="RABBITMQ_NOTIFICATION_QUEUE" value="orderflow.test.notification.user-registered" force="true"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>

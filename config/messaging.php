@@ -31,5 +31,13 @@ return [
             'dead_letter_exchange' => env('RABBITMQ_DEAD_LETTER_EXCHANGE', 'orderflow.dead'),
             'prefetch_count' => (int) env('RABBITMQ_CONSUMER_PREFETCH_COUNT', 10),
         ],
+        'notification-user-registered' => [
+            'queue' => env('RABBITMQ_NOTIFICATION_QUEUE', 'orderflow.notification.user-registered'),
+            'bindings' => [
+                'user.registered.v1',
+            ],
+            'dead_letter_exchange' => env('RABBITMQ_DEAD_LETTER_EXCHANGE', 'orderflow.dead'),
+            'prefetch_count' => (int) env('RABBITMQ_CONSUMER_PREFETCH_COUNT', 10),
+        ],
     ],
 ];

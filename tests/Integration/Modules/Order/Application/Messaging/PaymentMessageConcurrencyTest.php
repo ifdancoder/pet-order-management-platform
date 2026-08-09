@@ -104,6 +104,7 @@ function runPaymentMessageProcess(
 
     try {
         $processed = app(IntegrationMessageConsumer::class)->consume(
+            'order-payment-status',
             new IntegrationMessage(
                 messageId: '018f22e2-7c2a-7a33-8c4c-4ea690ad4f90',
                 name: 'payment.captured.v1',

@@ -11,7 +11,7 @@ use Shared\Application\Port\Out\Transaction\ITransactionManager;
 
 final class IntegrationMessageConsumer
 {
-    /** @var array<string, IIntegrationMessageHandler> */
+    /** @var array<string, array<string, IIntegrationMessageHandler>> */
     private array $handlers = [];
 
     /** @param iterable<IIntegrationMessageHandler> $handlers */
@@ -21,24 +21,30 @@ final class IntegrationMessageConsumer
         private readonly ITransactionManager $transaction,
     ) {
         foreach ($handlers as $handler) {
+            $consumerName = $handler->consumerName();
+
             foreach ($handler->messageNames() as $messageName) {
-                if (isset($this->handlers[$messageName])) {
+                if (isset($this->handlers[$consumerName][$messageName])) {
                     throw new LogicException(sprintf(
-                        'Integration message "%s" has multiple handlers.',
+                        'Consumer "%s" has multiple handlers for integration message "%s".',
+                        $consumerName,
                         $messageName,
                     ));
                 }
 
-                $this->handlers[$messageName] = $handler;
+                $this->handlers[$consumerName][$messageName] = $handler;
             }
         }
     }
 
-    public function consume(IntegrationMessage $message): bool
-    {
-        $handler = $this->handlers[$message->name]
+    public function consume(
+        string $consumerName,
+        IntegrationMessage $message,
+    ): bool {
+        $handler = $this->handlers[$consumerName][$message->name]
             ?? throw new LogicException(sprintf(
-                'No handler is registered for integration message "%s".',
+                'Consumer "%s" has no handler for integration message "%s".',
+                $consumerName,
                 $message->name,
             ));
 

@@ -51,8 +51,8 @@ final readonly class RabbitMqMessageConsumer
             false,
             false,
             false,
-            function (AMQPMessage $message): void {
-                $this->handle($message);
+            function (AMQPMessage $message) use ($consumerName): void {
+                $this->handle($consumerName, $message);
             },
         );
 
@@ -83,7 +83,7 @@ final readonly class RabbitMqMessageConsumer
                 return false;
             }
 
-            $this->handle($message);
+            $this->handle($consumerName, $message);
 
             return true;
         } finally {
@@ -92,11 +92,11 @@ final readonly class RabbitMqMessageConsumer
         }
     }
 
-    private function handle(AMQPMessage $message): void
+    private function handle(string $consumerName, AMQPMessage $message): void
     {
         try {
             $integrationMessage = $this->decoder->decode($message);
-            $this->messages->consume($integrationMessage);
+            $this->messages->consume($consumerName, $integrationMessage);
             $message->ack();
         } catch (Throwable $exception) {
             $this->logger->error('Integration message processing failed.', [
@@ -107,6 +107,7 @@ final readonly class RabbitMqMessageConsumer
                 'message_type' => $message->has('type')
                     ? $message->get('type')
                     : null,
+                'consumer' => $consumerName,
             ]);
             $message->nack(requeue: false);
         }

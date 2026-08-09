@@ -21,8 +21,8 @@ it('confirms an order once when a captured payment is delivered twice', function
     );
     $consumer = app(IntegrationMessageConsumer::class);
 
-    expect($consumer->consume($message))->toBeTrue()
-        ->and($consumer->consume($message))->toBeFalse();
+    expect($consumer->consume('order-payment-status', $message))->toBeTrue()
+        ->and($consumer->consume('order-payment-status', $message))->toBeFalse();
     $this->assertDatabaseHas('orders', [
         'id' => $order->getKey(),
         'status' => OrderStatus::Confirmed->value,
@@ -35,10 +35,13 @@ it('marks an order payment as failed', function (): void {
         'status' => OrderStatus::Placed->value,
     ]);
 
-    app(IntegrationMessageConsumer::class)->consume(paymentStatusTestMessage(
-        'payment.failed.v1',
-        $order->getKey(),
-    ));
+    app(IntegrationMessageConsumer::class)->consume(
+        'order-payment-status',
+        paymentStatusTestMessage(
+            'payment.failed.v1',
+            $order->getKey(),
+        ),
+    );
 
     $this->assertDatabaseHas('orders', [
         'id' => $order->getKey(),
@@ -52,6 +55,7 @@ it('rolls back inbox state when an order transition is rejected', function (): v
     ]);
 
     expect(fn (): bool => app(IntegrationMessageConsumer::class)->consume(
+        'order-payment-status',
         paymentStatusTestMessage('payment.captured.v1', $order->getKey()),
     ))->toThrow(InvalidOrderStatusTransition::class);
 

@@ -19,7 +19,7 @@ final readonly class PaymentStatusChangedHandler implements IIntegrationMessageH
 
     public function consumerName(): string
     {
-        return 'order.payment-status';
+        return 'order-payment-status';
     }
 
     public function messageNames(): array

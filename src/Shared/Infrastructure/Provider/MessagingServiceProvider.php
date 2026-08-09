@@ -115,17 +115,8 @@ final class MessagingServiceProvider extends ServiceProvider
                 $rpcTimeout = $config->get(
                     'messaging.rabbitmq.confirm_timeout_seconds',
                 );
-                $queue = $config->get(
-                    'messaging.consumers.order-payment-status.queue',
-                );
-                $bindings = $config->get(
-                    'messaging.consumers.order-payment-status.bindings',
-                );
-                $deadLetterExchange = $config->get(
-                    'messaging.consumers.order-payment-status.dead_letter_exchange',
-                );
-                $prefetchCount = $config->get(
-                    'messaging.consumers.order-payment-status.prefetch_count',
+                $consumers = self::rabbitMqConsumers(
+                    $config->get('messaging.consumers'),
                 );
 
                 if (
@@ -139,22 +130,9 @@ final class MessagingServiceProvider extends ServiceProvider
                     || ! is_float($readWriteTimeout) || $readWriteTimeout <= 0
                     || ! is_int($heartbeat) || $heartbeat < 1
                     || ! is_float($rpcTimeout) || $rpcTimeout <= 0
-                    || ! is_string($queue) || $queue === ''
-                    || ! is_array($bindings) || $bindings === []
-                    || ! is_string($deadLetterExchange) || $deadLetterExchange === ''
-                    || ! is_int($prefetchCount) || $prefetchCount < 1
                 ) {
                     throw new LogicException('RabbitMQ consumer configuration is invalid.');
                 }
-
-                foreach ($bindings as $binding) {
-                    if (! is_string($binding) || $binding === '') {
-                        throw new LogicException('RabbitMQ consumer binding is invalid.');
-                    }
-                }
-
-                /** @var list<string> $bindings */
-                $bindings = array_values($bindings);
 
                 return new RabbitMqMessageConsumer(
                     messages: $application->make(IntegrationMessageConsumer::class),
@@ -170,14 +148,7 @@ final class MessagingServiceProvider extends ServiceProvider
                     readWriteTimeoutSeconds: $readWriteTimeout,
                     heartbeatSeconds: $heartbeat,
                     rpcTimeoutSeconds: $rpcTimeout,
-                    consumers: [
-                        'order-payment-status' => [
-                            'queue' => $queue,
-                            'bindings' => $bindings,
-                            'dead_letter_exchange' => $deadLetterExchange,
-                            'prefetch_count' => $prefetchCount,
-                        ],
-                    ],
+                    consumers: $consumers,
                 );
             },
         );
@@ -234,5 +205,60 @@ final class MessagingServiceProvider extends ServiceProvider
                     ->onOneServer();
             },
         );
+    }
+
+    /**
+     * @return array<string, array{queue: string, bindings: list<string>, dead_letter_exchange: string, prefetch_count: int}>
+     */
+    private static function rabbitMqConsumers(mixed $configured): array
+    {
+        if (! is_array($configured) || $configured === []) {
+            throw new LogicException('At least one RabbitMQ consumer must be configured.');
+        }
+
+        $consumers = [];
+
+        foreach ($configured as $name => $consumer) {
+            if (! is_string($name) || $name === '' || ! is_array($consumer)) {
+                throw new LogicException('RabbitMQ consumer configuration is invalid.');
+            }
+
+            $queue = $consumer['queue'] ?? null;
+            $bindings = $consumer['bindings'] ?? null;
+            $deadLetterExchange = $consumer['dead_letter_exchange'] ?? null;
+            $prefetchCount = $consumer['prefetch_count'] ?? null;
+
+            if (
+                ! is_string($queue) || $queue === ''
+                || ! is_array($bindings) || $bindings === []
+                || ! is_string($deadLetterExchange) || $deadLetterExchange === ''
+                || ! is_int($prefetchCount) || $prefetchCount < 1
+            ) {
+                throw new LogicException(sprintf(
+                    'RabbitMQ consumer "%s" configuration is invalid.',
+                    $name,
+                ));
+            }
+
+            foreach ($bindings as $binding) {
+                if (! is_string($binding) || $binding === '') {
+                    throw new LogicException(sprintf(
+                        'RabbitMQ consumer "%s" binding is invalid.',
+                        $name,
+                    ));
+                }
+            }
+
+            /** @var list<string> $bindings */
+            $bindings = array_values($bindings);
+            $consumers[$name] = [
+                'queue' => $queue,
+                'bindings' => $bindings,
+                'dead_letter_exchange' => $deadLetterExchange,
+                'prefetch_count' => $prefetchCount,
+            ];
+        }
+
+        return $consumers;
     }
 }

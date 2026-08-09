@@ -34,8 +34,8 @@ it('applies the same message only once for a consumer', function (): void {
     $consumer = integrationMessageTestConsumer($handler);
     $message = integrationMessageTestMessage();
 
-    expect($consumer->consume($message))->toBeTrue()
-        ->and($consumer->consume($message))->toBeFalse()
+    expect($consumer->consume('test.consumer', $message))->toBeTrue()
+        ->and($consumer->consume('test.consumer', $message))->toBeFalse()
         ->and($handler->handled)->toBe(1);
     $this->assertDatabaseCount('processed_messages', 1);
 });
@@ -60,7 +60,7 @@ it('does not record a message when its handler fails', function (): void {
     };
 
     expect(fn (): bool => integrationMessageTestConsumer($handler)
-        ->consume(integrationMessageTestMessage()))
+        ->consume('test.failing-consumer', integrationMessageTestMessage()))
         ->toThrow(RuntimeException::class, 'Handler failed.');
     $this->assertDatabaseCount('processed_messages', 0);
 });
