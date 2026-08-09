@@ -19,6 +19,8 @@ use Modules\Identity\Application\Command\UpdateUser\UpdateUserHandler;
 use Modules\Identity\Application\Exception\EmailAlreadyExists;
 use Modules\Identity\Domain\Enum\UserStatus;
 use Modules\Identity\Infrastructure\Adapter\Out\Persistence\Eloquent\Model\UserModel;
+use Shared\Application\Event\IIntegrationEvent;
+use Shared\Application\Port\Out\Outbox\IOutboxWriter;
 
 uses(LazilyRefreshDatabase::class);
 
@@ -38,6 +40,28 @@ it('registers a pending user with a hashed password', function () {
         'email' => 'user@example.com',
         'status' => UserStatus::Pending->value,
     ]);
+    $this->assertDatabaseHas('outbox_messages', [
+        'event_name' => 'user.registered.v1',
+        'aggregate_id' => $user->id()->value(),
+    ]);
+});
+
+it('rolls back registration when its integration event cannot be stored', function (): void {
+    app()->bind(IOutboxWriter::class, static fn (): IOutboxWriter => new class implements IOutboxWriter
+    {
+        public function record(IIntegrationEvent $event): void
+        {
+            throw new RuntimeException('Outbox persistence failed.');
+        }
+    });
+
+    expect(fn () => app(RegisterUserHandler::class)(new RegisterUserCommand(
+        email: 'user@example.com',
+        password: 'plain-password',
+    )))->toThrow(RuntimeException::class, 'Outbox persistence failed.');
+
+    $this->assertDatabaseCount('users', 0);
+    $this->assertDatabaseCount('outbox_messages', 0);
 });
 
 it('rejects a duplicate email during registration', function () {
