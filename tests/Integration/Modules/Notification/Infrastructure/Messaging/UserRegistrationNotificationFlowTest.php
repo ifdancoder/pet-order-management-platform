@@ -6,6 +6,12 @@ use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
 use Modules\Identity\Application\Command\RegisterUser\RegisterUserCommand;
 use Modules\Identity\Application\Command\RegisterUser\RegisterUserHandler;
+use Modules\Notification\Application\Data\NotificationAttempt;
+use Modules\Notification\Application\Delivery\NotificationChannelResolver;
+use Modules\Notification\Application\Delivery\NotificationDispatcher;
+use Modules\Notification\Application\Port\Out\Delivery\INotificationChannel;
+use Modules\Notification\Application\Port\Out\Persistence\INotificationRepository;
+use Modules\Notification\Domain\Enum\NotificationChannel;
 use Modules\Notification\Domain\Enum\NotificationStatus;
 use Modules\Notification\Infrastructure\Adapter\Out\Persistence\Eloquent\Model\NotificationDeliveryModel;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
@@ -40,6 +46,55 @@ it('turns a published registration event into a pending welcome email', function
     expect(NotificationDeliveryModel::query()->sole()->data)->toBe([
         'user_id' => $user->id()->value(),
     ]);
+});
+
+it('keeps registration committed when welcome email delivery fails', function (): void {
+    $this->travelTo('2026-09-28 07:00:00');
+    $consumer = app(RabbitMqMessageConsumer::class);
+    $consumer->consumeOne('notification-user-registered');
+    notificationFlowPurgeQueue();
+    $user = app(RegisterUserHandler::class)(new RegisterUserCommand(
+        email: 'user@example.com',
+        password: 'plain-password',
+    ));
+    app(OutboxPublisher::class)->publishPending();
+    $consumer->consumeOne('notification-user-registered');
+    $channel = new class implements INotificationChannel
+    {
+        public function channel(): NotificationChannel
+        {
+            return NotificationChannel::Email;
+        }
+
+        public function send(NotificationAttempt $notification): void
+        {
+            throw new RuntimeException('SMTP unavailable');
+        }
+    };
+    $dispatcher = new NotificationDispatcher(
+        notifications: app(INotificationRepository::class),
+        channels: new NotificationChannelResolver([$channel]),
+        batchSize: 10,
+        claimTimeoutSeconds: 60,
+        maximumAttempts: 3,
+        initialRetryDelaySeconds: 5,
+        maximumRetryDelaySeconds: 60,
+    );
+
+    $result = $dispatcher->dispatchPending();
+
+    expect($result->retrying)->toBe(1)
+        ->and(DB::table('outbox_messages')->value('published_at'))->not->toBeNull();
+    $this->assertDatabaseHas('users', [
+        'id' => $user->id()->value(),
+        'email' => 'user@example.com',
+    ]);
+    $this->assertDatabaseHas('notification_deliveries', [
+        'recipient' => 'user@example.com',
+        'status' => NotificationStatus::Pending->value,
+        'last_error' => 'RuntimeException: SMTP unavailable',
+    ]);
+    $this->assertDatabaseCount('processed_messages', 1);
 });
 
 function notificationFlowPurgeQueue(): void

@@ -51,7 +51,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: php artisan queue:work database --queue=outbox,default --sleep=1 --tries=1 --timeout=20 --max-time=3600
+    command: php artisan queue:work database --queue=outbox,notifications,default --sleep=1 --tries=1 --timeout=20 --max-time=3600
     environment:
       APP_ENV: local
       CACHE_STORE: redis
