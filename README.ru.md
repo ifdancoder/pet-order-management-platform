@@ -1,0 +1,225 @@
+# OrderFlow
+
+OrderFlow - внутренняя платформа обработки заказов и фулфилмента, реализованная как модульный монолит на Laravel. Она предоставляет JSON HTTP API для учётных записей клиентов, заказов, платежей и возвратов, а координацию фулфилмента (платежи, отгрузки, уведомления) выполняет через внутреннюю шину событий поверх RabbitMQ.
+
+## Возможности
+
+- JWT-аутентификация с access и refresh токенами, жизненный цикл пользователя (pending, active, suspended, disabled).
+- Профили клиентов с адресами доставки, связанные с Identity только по идентификатору пользователя.
+- Резервирование остатков с блокировкой строк на уровне БД и идемпотентными ключами резервирования.
+- Управление жизненным циклом заказа: создание черновика, изменение позиций, оформление, переходы фулфилмента.
+- Применение промоакций на этапе оформления заказа (процентные и фиксированные скидки с правилами применимости).
+- Запросы на оплату по заказу, обработка webhook от Stripe и PayPal.
+- Асинхронная координация возвратов денег между Return и Payment через транзакционный outbox и RabbitMQ.
+- Бронирование отгрузки после захвата платежа.
+- Email-уведомления по доменным событиям (например, регистрация пользователя).
+- Запросы на возврат товара с проверкой применимости (статус заказа, окно возврата, купленное количество).
+- Request/correlation ID, которые передаются от HTTP-запроса через command bus, outbox и консьюмеров RabbitMQ в структурированные логи.
+
+## Архитектура
+
+Кодовая база - модульный монолит: одно приложение Laravel, несколько независимо структурированных бизнес-модулей в `src/Modules`, и сквозной код в `src/Shared`.
+
+Каждый модуль разделён на четыре слоя с фиксированным направлением зависимостей:
+
+```
+Presentation -> Application -> Domain
+Infrastructure -> Application -> Domain
+```
+
+- `Domain` содержит сущности, value object и доменные сервисы. Он не зависит от Illuminate и от других слоёв, включая Application того же модуля.
+- `Application` содержит команды, запросы, их обработчики и порты (интерфейсы), от которых эти обработчики зависят. Он не зависит от Infrastructure и Presentation.
+- `Infrastructure` реализует порты: Eloquent-репозитории, исходящие шлюзы, queue jobs, адаптеры RabbitMQ. Eloquent-модели - деталь хранения, ограниченная этим слоем.
+- `Presentation` содержит HTTP-контроллеры, Form Request и API Resource. Контроллеры отправляют команды и запросы через общие шины; бизнес-логики в них нет.
+
+Модули не читают Eloquent-модели или таблицы БД другого модуля. Межмодульное чтение идёт через явный порт, объявленный в Application-слое *потребляющего* модуля (например, `IOrderReturnLookup`, `ICustomerIdentityLookup`, `IReturnOrderGateway`) и реализованный в Infrastructure вызовом собственных команд или запросов другого модуля. `Shared` никогда не зависит от `Modules`. Эти правила проверяются architecture-тестами Pest (`tests/Unit/*ArchitectureTest.php`).
+
+Факты, которые должны асинхронно дойти до другого модуля (захваченный платёж, полученный возврат), публикуются как интеграционные события через транзакционный outbox и потребляются из RabbitMQ, а не вызываются синхронно внутри процесса.
+
+## Модули
+
+| Модуль | Ответственность |
+| --- | --- |
+| Identity | Учётные записи пользователей, JWT access/refresh токены, жизненный цикл статуса пользователя. |
+| Customer | Профиль клиента и адреса доставки. |
+| Inventory | Складские позиции и резервирования. |
+| Order | Жизненный цикл заказа и оркестрация оформления между Customer, Inventory, Promotion и Shipping. |
+| Promotion | Промокоды и правила применимости при оформлении заказа. |
+| Payment | Запросы на оплату, webhook Stripe/PayPal, координация возвратов денег. |
+| Shipping | Бронирование отгрузки и расчёт стоимости доставки. |
+| Return | Запросы на возврат товара, проверка применимости, координация возврата денег с Payment. |
+| Notification | Исходящие email-уведомления по доменным событиям. |
+
+Order, Inventory, Shipping, Notification и Promotion предоставляют только внутренние command/query контракты; публичных HTTP-маршрутов у них нет. Identity, Customer, Payment и Return предоставляют HTTP API, описанный ниже.
+
+## Технологический стек
+
+- PHP 8.3+ (Docker-образ использует PHP 8.5)
+- Laravel 13
+- PostgreSQL (база данных приложения и цель integration-тестов)
+- SQLite in memory (база по умолчанию для unit- и feature-тестов)
+- Redis (кеш и хранилище сессий)
+- RabbitMQ (транспорт интеграционных событий)
+- `lcobucci/jwt` (подпись access/refresh токенов)
+- `php-amqplib/php-amqplib` (клиент RabbitMQ)
+- Docker Compose (локальное окружение)
+- Pest / PHPUnit
+- PHPStan через Larastan (уровень 7)
+- Laravel Pint
+
+## Структура проекта
+
+```
+src/
+├── Modules/
+│   └── <ModuleName>/
+│       ├── Domain/
+│       ├── Application/
+│       ├── Infrastructure/
+│       └── Presentation/
+└── Shared/
+    ├── Application/   # контракты command/query bus, outbox, messaging
+    ├── Infrastructure/ # реализация bus, адаптеры RabbitMQ, хранение outbox
+    └── Presentation/   # сквозные HTTP-механизмы (например, correlation middleware)
+```
+
+Каждый модуль в `src/Modules` следует одному и тому же четырёхслойному делению, описанному в разделе «Архитектура». `src/Shared` предоставляет command/query bus, outbox и messaging-инфраструктуру RabbitMQ, на которой строится каждый модуль; бизнес-правил в нём нет.
+
+## Быстрый старт
+
+### Требования
+
+- Docker с Docker Compose
+- Git
+
+### Установка
+
+```bash
+cp .env.example .env
+docker compose build app
+docker compose run --rm app php artisan key:generate
+```
+
+### Окружение
+
+Учётные данные для локального PostgreSQL и RabbitMQ: `orderflow` / `orderflow`. При конфликте портов или подсети Docker с другими локальными сервисами переопределите их:
+
+```bash
+APP_PORT=8080 POSTGRES_PORT=55432 ORDERFLOW_SUBNET=172.31.241.0/24 docker compose up --detach
+```
+
+### База данных
+
+Миграции запускаются автоматически при старте контейнера `app`. Контейнер также создаёт локальную пару ключей JWT, если её ещё нет.
+
+### Запуск приложения
+
+```bash
+docker compose up --detach
+docker compose ps
+```
+
+Локальные адреса:
+
+- API: `http://localhost:8000`
+- RabbitMQ management: `http://localhost:15672`
+- PostgreSQL: `localhost:5432`
+- Redis: `localhost:6379`
+
+Остановить контейнеры без удаления данных БД и брокера:
+
+```bash
+docker compose down
+```
+
+Сгенерировать новую пару ключей JWT нужно только при ротации локальных ключей:
+
+```bash
+docker compose exec app php artisan identity:generate-jwt-keys --force
+```
+
+### Воркеры
+
+Docker Compose поднимает по одному контейнеру на каждую фоновую задачу:
+
+| Сервис | Роль |
+| --- | --- |
+| `queue-worker` | Выполняет `queue:work` для очередей `outbox`, `notifications`, `shipping`, `refunds`, `default`. |
+| `scheduler` | Выполняет `schedule:work`, который каждую секунду запускает публикацию outbox и job'ы диспетчеризации возвратов, отгрузок и уведомлений. |
+| `message-consumer` | Читает `order-payment-status` (Order реагирует на захваченные/неуспешные платежи). |
+| `notification-consumer` | Читает `notification-user-registered`. |
+| `shipping-consumer` | Читает `shipping-payment-captured`. |
+| `payment-return-consumer` | Читает `payment-return-received` (Payment реагирует на полученный возврат). |
+| `return-consumer` | Читает `return-payment-refunded` (Return реагирует на завершённый возврат денег). |
+
+Код приложения записывает интеграционные события в outbox в базе данных в той же транзакции, что и бизнес-изменение. Publisher outbox и консьюмеры RabbitMQ работают в отдельных процессах, поэтому сбой брокера не может откатить уже закоммиченную транзакцию.
+
+## API
+
+HTTP API версионирован под `/api/v1`. Для защищённых маршрутов требуется `Authorization: Bearer <access_token>`.
+
+| Метод | Путь | Модуль | Аутентификация |
+| --- | --- | --- | --- |
+| POST | `/api/v1/identity/auth/register` | Identity | - |
+| POST | `/api/v1/identity/auth/login` | Identity | - |
+| POST | `/api/v1/identity/auth/refresh` | Identity | - |
+| POST | `/api/v1/identity/auth/logout` | Identity | - |
+| GET | `/api/v1/identity/users/{userId}` | Identity | Bearer |
+| PATCH | `/api/v1/identity/users/{userId}` | Identity | Bearer |
+| DELETE | `/api/v1/identity/users/{userId}` | Identity | Bearer |
+| POST | `/api/v1/identity/users/{userId}/activate` | Identity | Bearer |
+| POST | `/api/v1/identity/users/{userId}/suspend` | Identity | Bearer |
+| POST | `/api/v1/identity/users/{userId}/restore` | Identity | Bearer |
+| POST | `/api/v1/customers/profile` | Customer | Bearer |
+| GET | `/api/v1/customers/profile` | Customer | Bearer |
+| PATCH | `/api/v1/customers/profile` | Customer | Bearer |
+| POST | `/api/v1/customers/profile/addresses` | Customer | Bearer |
+| PUT | `/api/v1/customers/profile/addresses/{addressId}` | Customer | Bearer |
+| DELETE | `/api/v1/customers/profile/addresses/{addressId}` | Customer | Bearer |
+| POST | `/api/v1/customers/profile/addresses/{addressId}/default` | Customer | Bearer |
+| POST | `/api/v1/orders/{orderId}/payments` | Payment | Bearer |
+| POST | `/api/v1/payments/webhooks/{provider}` | Payment | Подпись провайдера |
+| POST | `/api/v1/returns` | Return | Bearer |
+| GET | `/api/v1/returns/{returnId}` | Return | Bearer |
+
+Полный контракт запросов/ответов, включая правила валидации, коды ошибок и заголовки, находится в [`openapi.yaml`](openapi.yaml). Английская версия этого файла - [`README.md`](README.md).
+
+Каждый ответ содержит заголовки `X-Request-ID` и `X-Correlation-ID`. Если в запросе передан валидный UUID в заголовке с тем же именем, он сохраняется; иначе сервер генерирует новый.
+
+## Тестирование
+
+```bash
+docker compose exec app php artisan test --compact
+docker compose exec app composer test:integration
+```
+
+Unit-, feature- и architecture-тесты выполняются на in-memory SQLite. Integration-набор выполняется на выделенной PostgreSQL-базе `orderflow_test` и реальном RabbitMQ; он проверяет специфичное для PostgreSQL поведение, например блокировку строк при конкурентном доступе, и сквозную доставку сообщений. Для него нужны переменные окружения `RABBITMQ_USER=orderflow` и `RABBITMQ_PASSWORD=orderflow`.
+
+## Статический анализ
+
+```bash
+docker compose exec app composer analyse
+```
+
+PHPStan (через Larastan) запускается на уровне 7 для `app`, `bootstrap`, `config`, `database` и `src`.
+
+## Стиль кода
+
+```bash
+docker compose exec app vendor/bin/pint --format agent
+docker compose exec app composer validate --strict
+```
+
+## Разработка
+
+CI (`.github/workflows/ci.yml`) на каждый push и pull request запускает валидацию Composer, Pint, статический анализ, набор тестов на SQLite и integration-набор на PostgreSQL.
+
+Обработчики команд и запросов выполняются через общие шины (`ICommandBus`, `IQueryBus`). Шина не открывает транзакции БД: границы транзакций остаются явными внутри application-обработчиков, чтобы внешний HTTP-вызов (платёжный шлюз, служба доставки) никогда не выполнялся внутри открытой транзакции.
+
+## Планы развития
+
+Метрики и распределённый трейсинг не реализованы. Структурированное логирование и передача request/correlation ID уже есть; для метрик сначала нужно согласовать exporter и backend.
+
+## Лицензия
+
+MIT, согласно `composer.json`.

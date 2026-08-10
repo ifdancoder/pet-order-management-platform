@@ -1,0 +1,1013 @@
+openapi: 3.0.3
+info:
+  title: OrderFlow API
+  description: >
+    HTTP API for the OrderFlow order processing and fulfillment platform.
+    Every response carries `X-Request-ID` and `X-Correlation-ID` headers;
+    a valid UUID supplied in a request header of the same name is preserved,
+    otherwise the server generates one.
+  version: "1.0"
+  license:
+    name: MIT
+servers:
+  - url: http://localhost:8000
+    description: Local Docker environment
+tags:
+  - name: Authentication
+    description: Registration, login, and token lifecycle.
+  - name: Users
+    description: User account management.
+  - name: Customers
+    description: Customer profile and delivery addresses.
+  - name: Payments
+    description: Payment requests and provider webhooks.
+  - name: Returns
+    description: Return requests.
+
+paths:
+  /api/v1/identity/auth/register:
+    post:
+      tags: [Authentication]
+      operationId: registerUser
+      summary: Register a new user
+      description: Creates a user in the `pending` status. Does not return a token pair.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '409':
+          description: A user with this email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: { code: email_already_exists, message: A user with this email already exists. }
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/v1/identity/auth/login:
+    post:
+      tags: [Authentication]
+      operationId: login
+      summary: Exchange credentials for an access/refresh token pair
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email, maxLength: 254 }
+                password: { type: string, maxLength: 72 }
+      responses:
+        '200':
+          description: Token pair issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/TokenPair'
+        '401':
+          description: Credentials are invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: { code: invalid_credentials, message: The supplied credentials are invalid. }
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/v1/identity/auth/refresh:
+    post:
+      tags: [Authentication]
+      operationId: refreshAccessToken
+      summary: Rotate a refresh token for a new access/refresh token pair
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Token pair issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/TokenPair'
+        '401':
+          description: Refresh token is invalid, already used, or expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: { code: invalid_refresh_token, message: Refresh token is invalid. }
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/v1/identity/auth/logout:
+    post:
+      tags: [Authentication]
+      operationId: logout
+      summary: Revoke a refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '204':
+          description: Refresh token revoked
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/v1/identity/users/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    get:
+      tags: [Users]
+      operationId: getUser
+      summary: Get a user by ID
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: User found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/InvalidAccessToken'
+        '404':
+          description: User was not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: { code: user_not_found, message: User was not found. }
+    patch:
+      tags: [Users]
+      operationId: updateUser
+      summary: Update a user's email and/or password
+      description: At least one of `email` or `password` must be supplied.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string, format: email, maxLength: 254 }
+                password: { type: string, maxLength: 72 }
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/InvalidAccessToken'
+        '404':
+          description: User was not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: A user with this email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+    delete:
+      tags: [Users]
+      operationId: disableUser
+      summary: Disable a user
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: User disabled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/InvalidAccessToken'
+        '404':
+          description: User was not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          $ref: '#/components/responses/InvalidUserStatusTransition'
+
+  /api/v1/identity/users/{userId}/activate:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    post:
+      tags: [Users]
+      operationId: activateUser
+      summary: Activate a pending user
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: User activated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/InvalidAccessToken'
+        '404':
+          description: User was not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          $ref: '#/components/responses/InvalidUserStatusTransition'
+
+  /api/v1/identity/users/{userId}/suspend:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    post:
+      tags: [Users]
+      operationId: suspendUser
+      summary: Suspend an active user
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: User suspended
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/InvalidAccessToken'
+        '404':
+          description: User was not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          $ref: '#/components/responses/InvalidUserStatusTransition'
+
+  /api/v1/identity/users/{userId}/restore:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    post:
+      tags: [Users]
+      operationId: restoreUser
+      summary: Restore a suspended user to active
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: User restored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/InvalidAccessToken'
+        '404':
+          description: User was not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          $ref: '#/components/responses/InvalidUserStatusTransition'
+
+  /api/v1/customers/profile:
+    post:
+      tags: [Customers]
+      operationId: createCustomerProfile
+      summary: Create the customer profile for the authenticated user
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveCustomerProfileRequest'
+      responses:
+        '201':
+          description: Customer profile created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Customer'
+        '401':
+          $ref: '#/components/responses/InvalidAccessToken'
+        '409':
+          description: A customer profile already exists for this user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: { code: customer_already_exists, message: A customer profile already exists. }
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+    get:
+      tags: [Customers]
+      operationId: getCustomerProfile
+      summary: Get the authenticated user's customer profile
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Customer profile found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Customer'
+        '401':
+          $ref: '#/components/responses/InvalidAccessToken'
+        '404':
+          description: Customer was not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: { code: customer_not_found, message: Customer was not found. }
+    patch:
+      tags: [Customers]
+      operationId: updateCustomerProfile
+      summary: Update the authenticated user's customer profile
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveCustomerProfileRequest'
+      responses:
+        '200':
+          description: Customer profile updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Customer'
+        '401':
+          $ref: '#/components/responses/InvalidAccessToken'
+        '404':
+          description: Customer was not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: The customer profile is archived
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: { code: customer_archived, message: Customer profile is archived. }
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /api/v1/customers/profile/addresses:
+    post:
+      tags: [Customers]
+      operationId: addAddress
+      summary: Add a delivery address
+      description: The first address added becomes the default automatically.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveAddressRequest'
+      responses:
+        '201':
+          description: Address added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Customer'
+        '401':
+          $ref: '#/components/responses/InvalidAccessToken'
+        '404':
+          description: Customer was not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+
+  /api/v1/customers/profile/addresses/{addressId}:
+    parameters:
+      - $ref: '#/components/parameters/AddressId'
+    put:
+      tags: [Customers]
+      operationId: updateAddress
+      summary: Update a delivery address
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveAddressRequest'
+      responses:
+        '200':
+          description: Address updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Customer'
+        '401':
+          $ref: '#/components/responses/InvalidAccessToken'
+        '404':
+          description: Address was not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: { code: address_not_found, message: Address was not found. }
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+    delete:
+      tags: [Customers]
+      operationId: removeAddress
+      summary: Remove a delivery address
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204':
+          description: Address removed
+        '401':
+          $ref: '#/components/responses/InvalidAccessToken'
+        '404':
+          description: Address was not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/customers/profile/addresses/{addressId}/default:
+    parameters:
+      - $ref: '#/components/parameters/AddressId'
+    post:
+      tags: [Customers]
+      operationId: makeAddressDefault
+      summary: Make an address the default delivery address
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Default address changed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Customer'
+        '401':
+          $ref: '#/components/responses/InvalidAccessToken'
+        '404':
+          description: Address was not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/orders/{orderId}/payments:
+    post:
+      tags: [Payments]
+      operationId: requestPayment
+      summary: Request payment for an order
+      description: >
+        Owned by the Payment module; exposed under `/orders` because it acts
+        on an order. Requires an `Idempotency-Key` header; retrying the same
+        key returns the original payment instead of creating a new one.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, maxLength: 128 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, payment_method_reference]
+              properties:
+                provider:
+                  $ref: '#/components/schemas/PaymentProvider'
+                payment_method_reference:
+                  type: string
+                  maxLength: 255
+                  description: Opaque, provider-issued reference to a stored payment method. Never a raw card or account number.
+      responses:
+        '201':
+          description: Payment created (or, for a repeated idempotency key, the original payment)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Payment'
+        '401':
+          $ref: '#/components/responses/InvalidAccessToken'
+        '404':
+          description: Order was not found or is not payable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: { code: payment_not_allowed, message: The order cannot be paid. }
+        '409':
+          description: The idempotency key was already used for a different payment request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: { code: payment_idempotency_conflict, message: The idempotency key was already used for another payment request. }
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          description: The payment provider is temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: { code: payment_gateway_unavailable, message: The payment provider is temporarily unavailable. }
+
+  /api/v1/payments/webhooks/{provider}:
+    post:
+      tags: [Payments]
+      operationId: processPaymentWebhook
+      summary: Receive a payment provider webhook
+      description: >
+        Authenticated by provider signature, not a bearer token. Stripe
+        signs the raw body via the `Stripe-Signature` header. PayPal signs
+        via `PayPal-Transmission-Sig`, `PayPal-Transmission-Id`,
+        `PayPal-Transmission-Time`, `PayPal-Cert-Url`, and `PayPal-Auth-Algo`.
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema: { type: string, enum: [stripe, paypal] }
+        - name: Stripe-Signature
+          in: header
+          required: false
+          schema: { type: string }
+        - name: PayPal-Transmission-Sig
+          in: header
+          required: false
+          schema: { type: string }
+        - name: PayPal-Transmission-Id
+          in: header
+          required: false
+          schema: { type: string }
+        - name: PayPal-Transmission-Time
+          in: header
+          required: false
+          schema: { type: string }
+        - name: PayPal-Cert-Url
+          in: header
+          required: false
+          schema: { type: string }
+        - name: PayPal-Auth-Algo
+          in: header
+          required: false
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Raw event payload defined by the provider; not validated against an application-level schema.
+      responses:
+        '204':
+          description: Webhook accepted
+        '400':
+          description: The webhook signature or payload is invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: { code: invalid_payment_webhook, message: Payment webhook is invalid. }
+        '404':
+          description: The referenced payment was not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/v1/returns:
+    post:
+      tags: [Returns]
+      operationId: requestReturn
+      summary: Request a return for a completed order
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestReturnRequest'
+      responses:
+        '201':
+          description: Return created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ReturnRequest'
+        '401':
+          $ref: '#/components/responses/InvalidAccessToken'
+        '404':
+          description: Order was not found, not eligible, or does not belong to the caller
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: { code: return_not_found, message: Return or eligible order was not found. }
+        '409':
+          description: A return already exists for this order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: { code: return_already_exists, message: A return already exists for this order. }
+        '422':
+          description: >
+            The request body is malformed, or the order is not eligible for
+            return (outside the return window, wrong status, or items not
+            purchased in the requested quantity).
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationError'
+                  - $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/v1/returns/{returnId}:
+    get:
+      tags: [Returns]
+      operationId: getReturn
+      summary: Get a return by ID
+      description: Returns only a return that belongs to an order owned by the caller.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: returnId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Return found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ReturnRequest'
+        '401':
+          $ref: '#/components/responses/InvalidAccessToken'
+        '404':
+          description: Return was not found, or belongs to another customer's order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: RS256-signed access token returned by login/refresh.
+
+  parameters:
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    AddressId:
+      name: addressId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    ValidationFailed:
+      description: One or more fields failed validation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+    TooManyRequests:
+      description: Rate limit exceeded for this route
+      headers:
+        Retry-After:
+          schema: { type: integer }
+          description: Seconds until the rate limit window resets.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MessageError'
+          example:
+            message: Too Many Attempts.
+    InvalidAccessToken:
+      description: The bearer token is missing, invalid, or belongs to a non-active user
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: { code: invalid_access_token, message: Access token is invalid. }
+    InvalidUserStatusTransition:
+      description: The requested status transition is not valid for the user's current status
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: { code: invalid_user_status_transition, message: 'User is already active.' }
+
+  schemas:
+    Error:
+      type: object
+      description: Shape used by domain-level errors (a specific, named failure condition).
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string, example: user_not_found }
+            message: { type: string }
+
+    MessageError:
+      type: object
+      description: Shape used by framework-level errors (rate limiting, unauthenticated, unhandled).
+      required: [message]
+      properties:
+        message: { type: string }
+
+    ValidationError:
+      type: object
+      description: Laravel's default Form Request validation failure shape.
+      required: [message, errors]
+      properties:
+        message: { type: string, example: The given data was invalid. }
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+        password:
+          type: string
+          maxLength: 72
+          description: Minimum 12 characters; must contain mixed case, letters, numbers, and symbols.
+
+    RefreshTokenRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token: { type: string, maxLength: 512 }
+
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        status:
+          $ref: '#/components/schemas/UserStatus'
+
+    UserStatus:
+      type: integer
+      enum: [0, 1, 2, 3]
+      description: 0 = pending, 1 = active, 2 = suspended, 3 = disabled.
+
+    TokenPair:
+      type: object
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        token_type: { type: string, enum: [Bearer] }
+        access_expires_at: { type: string, format: date-time }
+        refresh_expires_at: { type: string, format: date-time }
+
+    SaveCustomerProfileRequest:
+      type: object
+      required: [given_name, family_name]
+      properties:
+        given_name: { type: string, maxLength: 100 }
+        family_name: { type: string, maxLength: 100 }
+        phone_number:
+          type: string
+          nullable: true
+          pattern: '^\+[1-9]\d{7,14}$'
+          description: E.164 format.
+
+    SaveAddressRequest:
+      type: object
+      required: [recipient_name, line_1, city, postal_code, country_code]
+      properties:
+        recipient_name: { type: string, maxLength: 200 }
+        line_1: { type: string, maxLength: 200 }
+        line_2: { type: string, nullable: true, maxLength: 200 }
+        city: { type: string, maxLength: 100 }
+        region: { type: string, nullable: true, maxLength: 100 }
+        postal_code: { type: string, maxLength: 32 }
+        country_code: { type: string, pattern: '^[A-Z]{2}$' }
+        make_default: { type: boolean, default: false }
+
+    Address:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        recipient_name: { type: string }
+        line_1: { type: string }
+        line_2: { type: string, nullable: true }
+        city: { type: string }
+        region: { type: string, nullable: true }
+        postal_code: { type: string }
+        country_code: { type: string }
+        is_default: { type: boolean }
+
+    Customer:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        identity_user_id: { type: string, format: uuid }
+        given_name: { type: string }
+        family_name: { type: string }
+        phone_number: { type: string, nullable: true }
+        status:
+          type: string
+          enum: [active, archived]
+        addresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/Address'
+
+    PaymentProvider:
+      type: string
+      enum: [stripe, paypal, fake]
+      description: '`fake` is a non-networked gateway for local development and tests.'
+
+    Payment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        order_id: { type: string, format: uuid }
+        amount:
+          type: integer
+          description: Minor currency units (for example, cents).
+        currency: { type: string, example: USD }
+        provider:
+          $ref: '#/components/schemas/PaymentProvider'
+        status:
+          type: string
+          enum: [pending, authorized, captured, failed, refunded]
+        provider_payment_id: { type: string, nullable: true }
+        failure_code: { type: string, nullable: true }
+
+    RequestReturnRequest:
+      type: object
+      required: [order_id, reason, items]
+      properties:
+        order_id: { type: string, format: uuid }
+        reason: { type: string, maxLength: 500 }
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [inventory_item_id, quantity]
+            properties:
+              inventory_item_id: { type: string, format: uuid }
+              quantity: { type: integer, minimum: 1 }
+
+    ReturnRequest:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        order_id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [requested, approved, rejected, received, refunded]
+        reason: { type: string }
+        refund_amount:
+          type: integer
+          description: Minor currency units (for example, cents).
+        currency: { type: string, example: USD }
+        requested_at: { type: string, format: date-time }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              inventory_item_id: { type: string, format: uuid }
+              quantity: { type: integer }
+              unit_price_amount: { type: integer }
