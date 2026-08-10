@@ -19,5 +19,6 @@ final readonly class OutboxMessage
         public DateTimeImmutable $occurredAt,
         public string $claimToken,
         public int $attempts,
+        public ?string $correlationId = null,
     ) {}
 }

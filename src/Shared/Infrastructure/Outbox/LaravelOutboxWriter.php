@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Shared\Infrastructure\Outbox;
 
 use Illuminate\Database\ConnectionInterface;
+use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Str;
 use JsonException;
 use Shared\Application\Event\IIntegrationEvent;
@@ -21,11 +22,14 @@ final readonly class LaravelOutboxWriter implements IOutboxWriter
     {
         $now = now()->toDateTimeString();
 
+        $correlationId = Context::get('correlation_id');
+
         $this->connection->table('outbox_messages')->insert([
             'message_id' => Str::uuid7()->toString(),
             'event_name' => $event->name(),
             'aggregate_id' => $event->aggregateId(),
             'payload' => json_encode($event->payload(), JSON_THROW_ON_ERROR),
+            'correlation_id' => is_string($correlationId) ? $correlationId : null,
             'occurred_at' => $now,
             'available_at' => $now,
             'attempts' => 0,

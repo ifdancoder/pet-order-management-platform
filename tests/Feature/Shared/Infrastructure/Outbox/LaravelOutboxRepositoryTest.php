@@ -3,11 +3,23 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Facades\Context;
 use Shared\Application\Event\IIntegrationEvent;
 use Shared\Application\Port\Out\Outbox\IOutboxRepository;
 use Shared\Application\Port\Out\Outbox\IOutboxWriter;
 
 uses(LazilyRefreshDatabase::class);
+
+it('claims the correlation id stored on the outbox message', function (): void {
+    Context::add('correlation_id', '018f22e2-7c2a-7a33-8c4c-4ea690ad4f95');
+    app(IOutboxWriter::class)->record(new RepositoryTestIntegrationEvent);
+    $repository = app(IOutboxRepository::class);
+
+    $claim = $repository->claimBatch(limit: 10, claimTimeoutSeconds: 60);
+
+    expect($claim)->toHaveCount(1)
+        ->and($claim[0]->correlationId)->toBe('018f22e2-7c2a-7a33-8c4c-4ea690ad4f95');
+});
 
 it('claims pending messages and recovers an expired claim', function (): void {
     $this->travelTo('2026-09-28 04:00:00');

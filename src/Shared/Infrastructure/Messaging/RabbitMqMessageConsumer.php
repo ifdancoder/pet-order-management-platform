@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Shared\Infrastructure\Messaging;
 
+use Illuminate\Support\Facades\Context;
+use Illuminate\Support\Str;
 use PhpAmqpLib\Channel\AMQPChannel;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Exception\AMQPTimeoutException;
@@ -96,6 +98,14 @@ final readonly class RabbitMqMessageConsumer
     {
         try {
             $integrationMessage = $this->decoder->decode($message);
+
+            $requestId = (string) Str::uuid();
+
+            Context::add([
+                'request_id' => $requestId,
+                'correlation_id' => $integrationMessage->correlationId ?? $requestId,
+            ]);
+
             $this->messages->consume($consumerName, $integrationMessage);
             $message->ack();
         } catch (Throwable $exception) {

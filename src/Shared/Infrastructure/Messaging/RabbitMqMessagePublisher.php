@@ -50,7 +50,7 @@ final class RabbitMqMessagePublisher implements IMessagePublisher
             'occurred_at' => $message->occurredAt->format(DATE_ATOM),
             'data' => $message->payload,
         ], JSON_THROW_ON_ERROR);
-        $amqpMessage = new AMQPMessage($body, [
+        $properties = [
             'app_id' => 'orderflow',
             'content_encoding' => 'utf-8',
             'content_type' => 'application/json',
@@ -58,7 +58,13 @@ final class RabbitMqMessagePublisher implements IMessagePublisher
             'message_id' => $message->messageId,
             'timestamp' => $message->occurredAt->getTimestamp(),
             'type' => $message->eventName,
-        ]);
+        ];
+
+        if ($message->correlationId !== null) {
+            $properties['correlation_id'] = $message->correlationId;
+        }
+
+        $amqpMessage = new AMQPMessage($body, $properties);
 
         try {
             $channel->basic_publish(

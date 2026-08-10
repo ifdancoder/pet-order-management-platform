@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Modules\Order\Domain\Enum\OrderStatus;
 use Modules\Order\Infrastructure\Adapter\Out\Persistence\Eloquent\Model\OrderModel;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
@@ -12,6 +14,60 @@ use Shared\Application\Port\Out\Messaging\IMessagePublisher;
 use Shared\Infrastructure\Messaging\RabbitMqMessageConsumer;
 
 uses(DatabaseMigrations::class);
+
+it('restores the correlation id carried on the message before handling', function (): void {
+    $consumer = app(RabbitMqMessageConsumer::class);
+    $consumer->consumeOne('order-payment-status');
+    rabbitMqConsumerTestPurgeQueue();
+    $order = OrderModel::factory()->create([
+        'status' => OrderStatus::Placed->value,
+    ]);
+
+    app(IMessagePublisher::class)->publish(new OutboxMessage(
+        messageId: '018f22e2-7c2a-7a33-8c4c-4ea690ad4f86',
+        eventName: 'payment.captured.v1',
+        aggregateId: '018f22e2-7c2a-7a33-8c4c-4ea690ad4f87',
+        payload: ['order_id' => $order->getKey()],
+        occurredAt: new DateTimeImmutable('2026-09-28T05:00:00+00:00'),
+        claimToken: '018f22e2-7c2a-7a33-8c4c-4ea690ad4f88',
+        attempts: 1,
+        correlationId: '018f22e2-7c2a-7a33-8c4c-4ea690ad4f89',
+    ));
+
+    expect($consumer->consumeOne('order-payment-status'))->toBeTrue();
+
+    $requestId = Context::get('request_id');
+
+    expect(Context::get('correlation_id'))->toBe('018f22e2-7c2a-7a33-8c4c-4ea690ad4f89')
+        ->and(Str::isUuid($requestId))->toBeTrue()
+        ->and($requestId)->not->toBe('018f22e2-7c2a-7a33-8c4c-4ea690ad4f89');
+});
+
+it('defaults the correlation id to a generated request id for legacy messages', function (): void {
+    $consumer = app(RabbitMqMessageConsumer::class);
+    $consumer->consumeOne('order-payment-status');
+    rabbitMqConsumerTestPurgeQueue();
+    $order = OrderModel::factory()->create([
+        'status' => OrderStatus::Placed->value,
+    ]);
+
+    app(IMessagePublisher::class)->publish(new OutboxMessage(
+        messageId: '018f22e2-7c2a-7a33-8c4c-4ea690ad4f8a',
+        eventName: 'payment.captured.v1',
+        aggregateId: '018f22e2-7c2a-7a33-8c4c-4ea690ad4f8b',
+        payload: ['order_id' => $order->getKey()],
+        occurredAt: new DateTimeImmutable('2026-09-28T05:00:00+00:00'),
+        claimToken: '018f22e2-7c2a-7a33-8c4c-4ea690ad4f8c',
+        attempts: 1,
+    ));
+
+    expect($consumer->consumeOne('order-payment-status'))->toBeTrue();
+
+    $requestId = Context::get('request_id');
+
+    expect(Str::isUuid($requestId))->toBeTrue()
+        ->and(Context::get('correlation_id'))->toBe($requestId);
+});
 
 it('acknowledges duplicate payment events after applying the order transition once', function (): void {
     expect(DB::connection()->getDriverName())->toBe('pgsql');

@@ -41,12 +41,15 @@ final class IntegrationMessageEnvelopeDecoder
             throw new InvalidArgumentException('Message envelope is invalid.');
         }
 
+        $correlationId = $message->has('correlation_id') ? $message->get('correlation_id') : null;
+
         return new IntegrationMessage(
             messageId: $messageId,
             name: $name,
             aggregateId: $aggregateId,
             occurredAt: new DateTimeImmutable($occurredAt),
             data: $data,
+            correlationId: is_string($correlationId) && $correlationId !== '' ? $correlationId : null,
         );
     }
 }

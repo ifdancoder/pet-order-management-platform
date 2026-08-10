@@ -159,6 +159,7 @@ final readonly class LaravelOutboxRepository implements IOutboxRepository
             occurredAt: new DateTimeImmutable((string) $row->occurred_at),
             claimToken: $claimToken,
             attempts: $attempts,
+            correlationId: $row->correlation_id !== null ? (string) $row->correlation_id : null,
         );
     }
 

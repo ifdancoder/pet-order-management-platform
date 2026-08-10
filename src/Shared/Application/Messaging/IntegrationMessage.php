@@ -15,5 +15,6 @@ final readonly class IntegrationMessage
         public string $aggregateId,
         public DateTimeImmutable $occurredAt,
         public array $data,
+        public ?string $correlationId = null,
     ) {}
 }
