@@ -13,6 +13,7 @@ use Modules\Order\Application\Data\CheckoutResult;
 use Modules\Order\Application\Exception\CheckoutIdempotencyConflict;
 use Modules\Order\Application\Exception\CheckoutInProgress;
 use Modules\Order\Application\Port\Out\Checkout\IInventoryCheckoutGateway;
+use Modules\Order\Application\Port\Out\Checkout\IShippingCheckoutGateway;
 use Modules\Order\Application\Port\Out\Identity\IOrderIdGenerator;
 use Modules\Order\Application\Port\Out\Persistence\ICheckoutRepository;
 use Modules\Order\Application\Port\Out\Persistence\IOrderRepository;
@@ -30,6 +31,7 @@ final readonly class CheckoutHandler
         private IOrderRepository $orders,
         private IOrderIdGenerator $orderIds,
         private IInventoryCheckoutGateway $inventory,
+        private IShippingCheckoutGateway $shipping,
         private ITransactionManager $transaction,
     ) {}
 
@@ -41,6 +43,7 @@ final readonly class CheckoutHandler
             currency: $command->currency,
             items: $command->items,
             promotionCodes: $command->promotionCodes,
+            shipping: $command->shipping,
         );
         $requestHash = $this->requestHasher->hash($context);
 
@@ -69,6 +72,14 @@ final readonly class CheckoutHandler
                 ),
                 $promotionQuote->appliedPromotionCodes,
             );
+            $shippingQuote = $context->shippingQuote();
+
+            if ($shippingQuote !== null) {
+                $order->applyShippingCost(
+                    new Money($shippingQuote->amount, $shippingQuote->currency),
+                    $shippingQuote->method,
+                );
+            }
 
             $reservationId = $this->inventory->reserve(
                 reservationKey: 'checkout:'.hash('sha256', $command->idempotencyKey),
@@ -76,6 +87,14 @@ final readonly class CheckoutHandler
             );
             $order->place();
             $this->orders->save($order);
+
+            if ($context->shipping !== null && $shippingQuote !== null) {
+                $this->shipping->createShipment(
+                    $order->id()->value(),
+                    $context->shipping,
+                    $shippingQuote,
+                );
+            }
             $this->checkouts->complete(
                 idempotencyKey: $command->idempotencyKey,
                 orderId: $order->id()->value(),

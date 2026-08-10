@@ -6,6 +6,7 @@ namespace Modules\Order\Application\Command\Checkout;
 
 use Modules\Order\Application\Data\CheckoutResult;
 use Modules\Order\Application\Data\OrderItemData;
+use Modules\Order\Application\Data\ShippingDetailsData;
 use Shared\Application\Bus\Command\ICommand;
 
 /** @implements ICommand<CheckoutResult> */
@@ -21,5 +22,6 @@ final readonly class CheckoutCommand implements ICommand
         public string $currency,
         public array $items,
         public array $promotionCodes = [],
+        public ?ShippingDetailsData $shipping = null,
     ) {}
 }

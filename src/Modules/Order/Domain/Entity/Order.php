@@ -22,6 +22,10 @@ final class Order
 
     private Money $discount;
 
+    private Money $shippingCost;
+
+    private ?string $shippingMethod;
+
     /** @var list<string> */
     private array $promotionCodes;
 
@@ -37,6 +41,8 @@ final class Order
         array $items = [],
         ?Money $discount = null,
         array $promotionCodes = [],
+        ?Money $shippingCost = null,
+        ?string $shippingMethod = null,
     ) {
         Money::zero($currency);
 
@@ -47,6 +53,14 @@ final class Order
         $this->discount = $discount ?? Money::zero($currency);
         $this->promotionCodes = [];
         $this->setPromotionDiscount($this->discount, $promotionCodes);
+        $this->shippingCost = $shippingCost ?? Money::zero($currency);
+        $this->shippingMethod = $shippingMethod;
+
+        if ($this->shippingCost->amount() > 0 && $this->shippingMethod === null) {
+            throw new \InvalidArgumentException(
+                'Shipping method and non-zero cost must be provided together.',
+            );
+        }
     }
 
     public static function draft(
@@ -90,7 +104,9 @@ final class Order
 
     public function total(): Money
     {
-        return $this->subtotal()->subtract($this->discount);
+        return $this->subtotal()
+            ->subtract($this->discount)
+            ->add($this->shippingCost);
     }
 
     public function subtotal(): Money
@@ -113,6 +129,32 @@ final class Order
     public function promotionCodes(): array
     {
         return $this->promotionCodes;
+    }
+
+    public function shippingCost(): Money
+    {
+        return $this->shippingCost;
+    }
+
+    public function shippingMethod(): ?string
+    {
+        return $this->shippingMethod;
+    }
+
+    public function applyShippingCost(Money $cost, string $method): void
+    {
+        $this->guardStatus(OrderStatus::Draft);
+
+        if ($cost->currency() !== $this->currency) {
+            $cost->add(Money::zero($this->currency));
+        }
+
+        if (trim($method) === '') {
+            throw new \InvalidArgumentException('Shipping method cannot be blank.');
+        }
+
+        $this->shippingCost = $cost;
+        $this->shippingMethod = $method;
     }
 
     /** @param list<string> $promotionCodes */

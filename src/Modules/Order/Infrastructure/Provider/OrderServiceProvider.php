@@ -7,6 +7,7 @@ namespace Modules\Order\Infrastructure\Provider;
 use Illuminate\Support\ServiceProvider;
 use Modules\Order\Application\Checkout\CheckoutRulePipeline;
 use Modules\Order\Application\Checkout\Rule\ApplyPromotionsRule;
+use Modules\Order\Application\Checkout\Rule\CalculateShippingRule;
 use Modules\Order\Application\Checkout\Rule\CustomerCanOrderRule;
 use Modules\Order\Application\Checkout\Rule\InventoryAvailableRule;
 use Modules\Order\Application\Checkout\Rule\OrderNotEmptyRule;
@@ -28,6 +29,7 @@ use Modules\Order\Application\Port\In\IOrderPayment;
 use Modules\Order\Application\Port\Out\Checkout\ICustomerCheckoutGateway;
 use Modules\Order\Application\Port\Out\Checkout\IInventoryCheckoutGateway;
 use Modules\Order\Application\Port\Out\Checkout\IPromotionCheckoutGateway;
+use Modules\Order\Application\Port\Out\Checkout\IShippingCheckoutGateway;
 use Modules\Order\Application\Port\Out\Identity\IOrderIdGenerator;
 use Modules\Order\Application\Port\Out\Persistence\ICheckoutRepository;
 use Modules\Order\Application\Port\Out\Persistence\IOrderRepository;
@@ -36,6 +38,7 @@ use Modules\Order\Application\Query\GetOrder\GetOrderQuery;
 use Modules\Order\Infrastructure\Adapter\Out\Checkout\CustomerCheckoutGateway;
 use Modules\Order\Infrastructure\Adapter\Out\Checkout\InventoryCheckoutGateway;
 use Modules\Order\Infrastructure\Adapter\Out\Checkout\PromotionCheckoutGateway;
+use Modules\Order\Infrastructure\Adapter\Out\Checkout\ShippingCheckoutGateway;
 use Modules\Order\Infrastructure\Adapter\Out\Identity\LaravelOrderIdGenerator;
 use Modules\Order\Infrastructure\Adapter\Out\Persistence\Eloquent\Repository\EloquentCheckoutRepository;
 use Modules\Order\Infrastructure\Adapter\Out\Persistence\Eloquent\Repository\EloquentOrderRepository;
@@ -52,6 +55,7 @@ final class OrderServiceProvider extends ServiceProvider
         $this->app->bind(ICustomerCheckoutGateway::class, CustomerCheckoutGateway::class);
         $this->app->bind(IInventoryCheckoutGateway::class, InventoryCheckoutGateway::class);
         $this->app->bind(IPromotionCheckoutGateway::class, PromotionCheckoutGateway::class);
+        $this->app->bind(IShippingCheckoutGateway::class, ShippingCheckoutGateway::class);
         $this->app->bind(IOrderPayment::class, OrderPayment::class);
         $this->app->tag(
             PaymentStatusChangedHandler::class,
@@ -62,6 +66,7 @@ final class OrderServiceProvider extends ServiceProvider
             OrderNotEmptyRule::class,
             InventoryAvailableRule::class,
             ApplyPromotionsRule::class,
+            CalculateShippingRule::class,
         ], 'order.checkout.rules');
         $this->app->singleton(
             CheckoutRulePipeline::class,

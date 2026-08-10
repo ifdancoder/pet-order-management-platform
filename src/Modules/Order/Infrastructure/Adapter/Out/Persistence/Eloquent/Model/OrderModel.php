@@ -26,6 +26,8 @@ final class OrderModel extends Model
         'status',
         'discount_amount',
         'total_amount',
+        'shipping_cost_amount',
+        'shipping_method',
     ];
 
     protected function casts(): array
@@ -33,6 +35,7 @@ final class OrderModel extends Model
         return [
             'total_amount' => 'integer',
             'discount_amount' => 'integer',
+            'shipping_cost_amount' => 'integer',
         ];
     }
 

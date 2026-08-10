@@ -24,6 +24,8 @@ final class OrderModelFactory extends Factory
             'status' => OrderStatus::Draft->value,
             'discount_amount' => 0,
             'total_amount' => 0,
+            'shipping_cost_amount' => 0,
+            'shipping_method' => null,
         ];
     }
 }

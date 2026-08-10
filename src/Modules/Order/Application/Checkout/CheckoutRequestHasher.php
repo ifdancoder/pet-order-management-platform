@@ -31,6 +31,17 @@ final readonly class CheckoutRequestHasher
             'customer_id' => $context->customerId,
             'items' => $items,
             'promotion_codes' => $context->promotionCodes,
+            'shipping' => $context->shipping === null ? null : [
+                'method' => $context->shipping->method,
+                'recipient_name' => $context->shipping->recipientName,
+                'line1' => $context->shipping->line1,
+                'line2' => $context->shipping->line2,
+                'city' => $context->shipping->city,
+                'region' => $context->shipping->region,
+                'postal_code' => $context->shipping->postalCode,
+                'country_code' => $context->shipping->countryCode,
+                'weight_grams' => $context->shipping->weightGrams,
+            ],
         ], JSON_THROW_ON_ERROR));
     }
 }

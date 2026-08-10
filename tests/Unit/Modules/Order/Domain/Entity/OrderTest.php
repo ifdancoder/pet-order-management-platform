@@ -127,6 +127,18 @@ it('applies a promotion discount to the order total', function () {
         ->and($order->promotionCodes())->toBe(['SAVE20']);
 });
 
+it('adds shipping cost to the discounted order total', function () {
+    $order = draftOrder();
+    $order->addItem(orderItem());
+    $order->applyPromotionDiscount(new Money(500, 'USD'), ['SAVE20']);
+
+    $order->applyShippingCost(new Money(650, 'USD'), 'courier');
+
+    expect($order->shippingCost()->amount())->toBe(650)
+        ->and($order->shippingMethod())->toBe('courier')
+        ->and($order->total()->amount())->toBe(2650);
+});
+
 it('rejects a promotion discount above the subtotal', function () {
     $order = draftOrder();
     $order->addItem(orderItem());

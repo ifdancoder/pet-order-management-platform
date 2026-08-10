@@ -48,6 +48,11 @@ final class OrderMapper
                 $orderModel->currency,
             ),
             promotionCodes: $promotionCodes,
+            shippingCost: new Money(
+                $orderModel->shipping_cost_amount,
+                $orderModel->currency,
+            ),
+            shippingMethod: $orderModel->shipping_method,
         );
     }
 
@@ -59,5 +64,7 @@ final class OrderMapper
         $model->status = $order->status()->value;
         $model->discount_amount = $order->discount()->amount();
         $model->total_amount = $order->total()->amount();
+        $model->shipping_cost_amount = $order->shippingCost()->amount();
+        $model->shipping_method = $order->shippingMethod();
     }
 }

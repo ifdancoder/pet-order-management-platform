@@ -8,8 +8,11 @@ use Modules\Customer\Infrastructure\Adapter\Out\Persistence\Eloquent\Model\Custo
 use Modules\Inventory\Infrastructure\Adapter\Out\Persistence\Eloquent\Model\InventoryItemModel;
 use Modules\Order\Application\Command\Checkout\CheckoutCommand;
 use Modules\Order\Application\Data\OrderItemData;
+use Modules\Order\Application\Data\ShippingDetailsData;
+use Modules\Order\Application\Data\ShippingQuote;
 use Modules\Order\Application\Exception\CheckoutIdempotencyConflict;
 use Modules\Order\Application\Exception\CheckoutRejected;
+use Modules\Order\Application\Port\Out\Checkout\IShippingCheckoutGateway;
 use Modules\Order\Application\Port\Out\Persistence\IOrderRepository;
 use Modules\Order\Application\Query\GetOrder\GetOrderQuery;
 use Modules\Order\Domain\Entity\Order;
@@ -96,6 +99,29 @@ it('stores the applied promotion snapshot and discounted total', function (): vo
     $this->assertDatabaseHas('order_applied_promotions', [
         'order_id' => $result->orderId,
         'promotion_code' => 'SAVE20',
+    ]);
+});
+
+it('adds a shipping quote and creates a shipment atomically', function (): void {
+    [$customer, $inventoryItem] = checkoutRecords();
+
+    $result = app(ICommandBus::class)->dispatch(checkoutCommand(
+        customerId: $customer->getKey(),
+        inventoryItemId: $inventoryItem->getKey(),
+        shipping: checkoutShippingDetails(),
+    ));
+
+    $this->assertDatabaseHas('orders', [
+        'id' => $result->orderId,
+        'shipping_method' => 'courier',
+        'shipping_cost_amount' => 650,
+        'total_amount' => 3150,
+    ]);
+    $this->assertDatabaseHas('shipments', [
+        'order_id' => $result->orderId,
+        'method' => 'courier',
+        'cost_amount' => 650,
+        'status' => 'pending',
     ]);
 });
 
@@ -194,6 +220,43 @@ it('rolls back the reservation when order persistence fails', function (): void 
     $this->assertDatabaseCount('order_checkouts', 0);
 });
 
+it('rolls back the order and reservation when shipment persistence fails', function (): void {
+    [$customer, $inventoryItem] = checkoutRecords();
+    app()->bind(IShippingCheckoutGateway::class, static fn (): IShippingCheckoutGateway => new class implements IShippingCheckoutGateway
+    {
+        public function quote(
+            ShippingDetailsData $shipping,
+            string $currency,
+        ): ShippingQuote {
+            return new ShippingQuote('courier', 650, $currency);
+        }
+
+        public function createShipment(
+            string $orderId,
+            ShippingDetailsData $shipping,
+            ShippingQuote $quote,
+        ): void {
+            throw new RuntimeException('Shipment persistence failed.');
+        }
+    });
+
+    $action = fn () => app(ICommandBus::class)->dispatch(checkoutCommand(
+        customerId: $customer->getKey(),
+        inventoryItemId: $inventoryItem->getKey(),
+        shipping: checkoutShippingDetails(),
+    ));
+
+    expect($action)->toThrow(RuntimeException::class, 'Shipment persistence failed.');
+    $this->assertDatabaseHas('inventory_items', [
+        'id' => $inventoryItem->getKey(),
+        'reserved' => 0,
+    ]);
+    $this->assertDatabaseCount('orders', 0);
+    $this->assertDatabaseCount('shipments', 0);
+    $this->assertDatabaseCount('inventory_reservations', 0);
+    $this->assertDatabaseCount('order_checkouts', 0);
+});
+
 /** @return array{CustomerModel, InventoryItemModel} */
 function checkoutRecords(int $onHand = 1): array
 {
@@ -213,6 +276,7 @@ function checkoutCommand(
     string $inventoryItemId,
     int $quantity = 1,
     array $promotionCodes = [],
+    ?ShippingDetailsData $shipping = null,
 ): CheckoutCommand {
     return new CheckoutCommand(
         idempotencyKey: 'checkout-request-1',
@@ -227,5 +291,21 @@ function checkoutCommand(
             ),
         ],
         promotionCodes: $promotionCodes,
+        shipping: $shipping,
+    );
+}
+
+function checkoutShippingDetails(): ShippingDetailsData
+{
+    return new ShippingDetailsData(
+        method: 'courier',
+        recipientName: 'Jane Doe',
+        line1: '100 Main Street',
+        line2: null,
+        city: 'New York',
+        region: 'NY',
+        postalCode: '10001',
+        countryCode: 'US',
+        weightGrams: 1000,
     );
 }
