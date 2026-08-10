@@ -36,6 +36,39 @@ Modules do not read another module's Eloquent models or database tables. Cross-m
 
 Cross-module facts that need to reach another module asynchronously (a captured payment, a received return) are published as integration events through a transactional outbox and consumed from RabbitMQ, rather than called synchronously in-process.
 
+## Design Patterns
+
+Patterns used as named GoF/enterprise patterns, not just "the general idea":
+
+| Pattern | Where | Example |
+| --- | --- | --- |
+| Command | Every module's `Application/Command` | `RequestReturnCommand` + `RequestReturnHandler` |
+| Query | Every module's `Application/Query` | `GetReturnQuery` + `GetReturnHandler` |
+| Mediator (Command/Query Bus) | `Shared\Infrastructure\Bus` | `LaravelCommandBus`, `LaravelQueryBus` |
+| Middleware pipeline | `LaravelCommandBus` | `array_reduce` over `ICommandMiddleware[]`, currently `LoggingCommandMiddleware` |
+| Decorator | `Shared\Infrastructure\Bus\Query\LoggingQueryBus` | Wraps `IQueryBus`, adds logging without changing the interface |
+| Repository | Every module's `Application/Port/Out/Persistence` + Eloquent implementation | `IOrderRepository` / `EloquentOrderRepository` |
+| Mapper | Every module's `Infrastructure/Adapter/Out/Persistence/Eloquent/Mapper` | `PromotionMapper` converts between the Eloquent model and the domain entity |
+| Adapter | Every module's `Infrastructure/Adapter/Out` | `RabbitMqMessagePublisher`, `StripePaymentGateway` |
+| Strategy | Shipping | `CourierShippingStrategy`, `ExpressShippingStrategy`, `InternationalShippingStrategy`, `PickupPointShippingStrategy` behind `IShippingCostStrategy` |
+| Factory / Resolver | Payment, Shipping, Notification | `PaymentGatewayResolver`, `ShippingStrategyResolver`, `NotificationChannelResolver` pick a concrete implementation by enum/key |
+| Specification | Return, Promotion | `WithinReturnWindowSpecification`, `DateRangeSpecification`, composed with `AndReturnEligibilitySpecification` / `AndSpecification` |
+| Composite | Promotion | `CompositeDiscount` combines multiple `IDiscountPolicy` instances |
+
+Two things that look like a pattern from the table above but are implemented more simply, on purpose:
+
+- **Order status, Payment status, Return status are not the GoF State pattern.** Each is a backed enum plus a guard method (`transition($expected, $target)`) on the entity that throws on an invalid move. There are no separate polymorphic state classes; a finite-state-machine guard was enough and avoids a layer of indirection nothing else needs.
+- **Checkout validation is a rule pipeline, not Chain of Responsibility.** `Modules\Order\Application\Checkout\CheckoutRulePipeline` runs a flat `iterable<ICheckoutRule>` (`OrderNotEmptyRule`, `CustomerCanOrderRule`, `InventoryAvailableRule`, `ApplyPromotionsRule`, `CalculateShippingRule`). Each rule is independent; none of them decide whether to invoke the next one, so there is no actual chain.
+- **There is no in-process Observer/domain-event dispatcher.** Nothing in `src` uses Laravel's `Event`/listener system. Every reaction to a business fact crosses module boundaries through the outbox → RabbitMQ → consumer path described above, which is publish/subscribe at the process boundary, not the classic Subject/Observer pattern.
+
+## Notable Implementation Details
+
+- **Idempotency**: payment requests take a client-supplied `Idempotency-Key` header; retrying it returns the original payment instead of creating a second one. Refunds are keyed by `refund_id` end-to-end, and `processed_messages` (consumer, message_id) makes RabbitMQ message handling idempotent independent of retries or redelivery.
+- **Outbox delivery**: `outbox_messages` rows are claimed with `FOR UPDATE SKIP LOCKED` (PostgreSQL) so multiple publisher processes never double-publish the same row; a claim carries a token and an expiry, and an unpublished claim is recovered automatically after it times out.
+- **Concurrency in Inventory**: reservations lock the relevant inventory rows in ascending ID order inside one transaction, which is what prevents deadlocks under concurrent reservations and is verified by an integration test that runs competing PostgreSQL connections against the same stock.
+- **Correlation propagation**: `X-Request-ID`/`X-Correlation-ID` flow from the HTTP middleware through the command bus's log context, into the outbox row, onto the RabbitMQ message's native `correlation_id` property, and back into the consumer's log context, without touching the business payload. Older outbox rows and messages without this metadata still decode correctly.
+- **Transaction boundaries stop at the process, not the network**: application handlers open the transaction; the actual HTTP call to a payment gateway or shipping provider always happens outside of it, so a slow or failing third party can never hold a database lock.
+
 ## Modules
 
 | Module | Responsibility |

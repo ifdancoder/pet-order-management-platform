@@ -36,6 +36,39 @@ Infrastructure -> Application -> Domain
 
 Факты, которые должны асинхронно дойти до другого модуля (захваченный платёж, полученный возврат), публикуются как интеграционные события через транзакционный outbox и потребляются из RabbitMQ, а не вызываются синхронно внутри процесса.
 
+## Паттерны проектирования
+
+Паттерны применены как именованные GoF/enterprise-паттерны, а не просто "похожая идея":
+
+| Паттерн | Где | Пример |
+| --- | --- | --- |
+| Command | `Application/Command` в каждом модуле | `RequestReturnCommand` + `RequestReturnHandler` |
+| Query | `Application/Query` в каждом модуле | `GetReturnQuery` + `GetReturnHandler` |
+| Mediator (Command/Query Bus) | `Shared\Infrastructure\Bus` | `LaravelCommandBus`, `LaravelQueryBus` |
+| Middleware pipeline | `LaravelCommandBus` | `array_reduce` по `ICommandMiddleware[]`, сейчас это `LoggingCommandMiddleware` |
+| Decorator | `Shared\Infrastructure\Bus\Query\LoggingQueryBus` | Оборачивает `IQueryBus`, добавляет логирование, не меняя интерфейс |
+| Repository | `Application/Port/Out/Persistence` в каждом модуле + Eloquent-реализация | `IOrderRepository` / `EloquentOrderRepository` |
+| Mapper | `Infrastructure/Adapter/Out/Persistence/Eloquent/Mapper` в каждом модуле | `PromotionMapper` конвертирует между Eloquent-моделью и доменной сущностью |
+| Adapter | `Infrastructure/Adapter/Out` в каждом модуле | `RabbitMqMessagePublisher`, `StripePaymentGateway` |
+| Strategy | Shipping | `CourierShippingStrategy`, `ExpressShippingStrategy`, `InternationalShippingStrategy`, `PickupPointShippingStrategy` за `IShippingCostStrategy` |
+| Factory / Resolver | Payment, Shipping, Notification | `PaymentGatewayResolver`, `ShippingStrategyResolver`, `NotificationChannelResolver` выбирают конкретную реализацию по enum/ключу |
+| Specification | Return, Promotion | `WithinReturnWindowSpecification`, `DateRangeSpecification`, комбинируются через `AndReturnEligibilitySpecification` / `AndSpecification` |
+| Composite | Promotion | `CompositeDiscount` объединяет несколько `IDiscountPolicy` |
+
+Три вещи из таблицы выше на первый взгляд похожи на паттерн, но реализованы проще, намеренно:
+
+- **Статусы Order, Payment, Return - это не GoF State.** У каждого есть backed enum и метод-guard (`transition($expected, $target)`) на сущности, который бросает исключение при недопустимом переходе. Отдельных полиморфных классов состояний нет: guard в виде конечного автомата оказался достаточен и не добавляет слой косвенности, который больше нигде не нужен.
+- **Валидация checkout - это rule pipeline, а не Chain of Responsibility.** `Modules\Order\Application\Checkout\CheckoutRulePipeline` последовательно выполняет плоский `iterable<ICheckoutRule>` (`OrderNotEmptyRule`, `CustomerCanOrderRule`, `InventoryAvailableRule`, `ApplyPromotionsRule`, `CalculateShippingRule`). Каждое правило независимо, ни одно не решает, вызывать ли следующее, поэтому настоящей цепочки нет.
+- **In-process Observer/domain-event диспетчера нет.** Нигде в `src` не используется `Event`/листенеры Laravel. Любая реакция на бизнес-факт пересекает границу модуля только через outbox → RabbitMQ → consumer, описанный выше, а это publish/subscribe на границе процессов, а не классический Subject/Observer.
+
+## Заметные детали реализации
+
+- **Идемпотентность**: запрос на оплату принимает клиентский заголовок `Idempotency-Key`; повтор с тем же ключом возвращает исходный платёж, а не создаёт второй. Возвраты денег идентифицируются `refund_id` сквозным образом, а `processed_messages` (consumer, message_id) делает обработку сообщений RabbitMQ идемпотентной независимо от повторов и передоставки.
+- **Доставка через outbox**: строки `outbox_messages` захватываются через `FOR UPDATE SKIP LOCKED` (PostgreSQL), поэтому несколько процессов publisher никогда не опубликуют одну и ту же строку дважды; у захвата есть токен и срок, и непубликованный захват автоматически освобождается после истечения таймаута.
+- **Конкурентность в Inventory**: резервирование блокирует нужные строки остатков в порядке возрастания ID внутри одной транзакции - именно это предотвращает deadlock при конкурентных резервированиях, что проверяется integration-тестом, запускающим конкурирующие подключения к PostgreSQL на один и тот же остаток.
+- **Передача correlation**: `X-Request-ID`/`X-Correlation-ID` проходят от HTTP middleware через log context command bus, попадают в строку outbox, в нативное свойство `correlation_id` сообщения RabbitMQ и обратно в log context консьюмера, не затрагивая бизнес-payload. Старые строки outbox и сообщения без этих метаданных по-прежнему корректно декодируются.
+- **Граница транзакции заканчивается на процессе, а не на сети**: транзакцию открывает application-обработчик; сам HTTP-вызов к платёжному шлюзу или службе доставки всегда выполняется вне неё, поэтому медленный или падающий внешний сервис не может удерживать блокировку в БД.
+
 ## Модули
 
 | Модуль | Ответственность |
