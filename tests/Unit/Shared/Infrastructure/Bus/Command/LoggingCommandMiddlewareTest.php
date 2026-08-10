@@ -47,6 +47,11 @@ it('logs command execution without serializing command data', function () {
         ->and($logger->records[0]['context'])->toBe([
             'command' => LoggingMiddlewareTestCommand::class,
         ])
+        ->and($logger->records[1]['message'])->toBe('Command completed.')
+        ->and($logger->records[1]['context'])->toHaveKeys(['command', 'duration_ms', 'outcome'])
+        ->and($logger->records[1]['context']['command'])->toBe(LoggingMiddlewareTestCommand::class)
+        ->and($logger->records[1]['context']['outcome'])->toBe('success')
+        ->and($logger->records[1]['context']['duration_ms'])->toBeFloat()
         ->and(json_encode($logger->records))->not->toContain('do-not-log-this');
 });
 
@@ -65,8 +70,9 @@ it('logs the exception type and rethrows command failures', function () {
 
     expect($logger->records)->toHaveCount(2)
         ->and($logger->records[1]['message'])->toBe('Command failed.')
-        ->and($logger->records[1]['context'])->toBe([
-            'command' => LoggingMiddlewareTestCommand::class,
-            'exception' => RuntimeException::class,
-        ]);
+        ->and($logger->records[1]['context'])->toHaveKeys(['command', 'exception', 'duration_ms', 'outcome'])
+        ->and($logger->records[1]['context']['command'])->toBe(LoggingMiddlewareTestCommand::class)
+        ->and($logger->records[1]['context']['exception'])->toBe(RuntimeException::class)
+        ->and($logger->records[1]['context']['outcome'])->toBe('failure')
+        ->and($logger->records[1]['context']['duration_ms'])->toBeFloat();
 });

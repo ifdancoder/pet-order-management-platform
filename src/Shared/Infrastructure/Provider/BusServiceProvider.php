@@ -6,6 +6,7 @@ namespace Shared\Infrastructure\Provider;
 
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
+use Psr\Log\LoggerInterface;
 use Shared\Application\Bus\Command\ICommandBus;
 use Shared\Application\Bus\Query\IQueryBus;
 use Shared\Infrastructure\Bus\Command\LaravelCommandBus;
@@ -13,6 +14,7 @@ use Shared\Infrastructure\Bus\Command\LoggingCommandMiddleware;
 use Shared\Infrastructure\Bus\HandlerInvoker;
 use Shared\Infrastructure\Bus\HandlerRegistry;
 use Shared\Infrastructure\Bus\Query\LaravelQueryBus;
+use Shared\Infrastructure\Bus\Query\LoggingQueryBus;
 
 final class BusServiceProvider extends ServiceProvider
 {
@@ -33,8 +35,9 @@ final class BusServiceProvider extends ServiceProvider
 
         $this->app->singleton(
             IQueryBus::class,
-            fn (Application $application): IQueryBus => new LaravelQueryBus(
-                $application->make(HandlerInvoker::class),
+            fn (Application $application): IQueryBus => new LoggingQueryBus(
+                new LaravelQueryBus($application->make(HandlerInvoker::class)),
+                $application->make(LoggerInterface::class),
             ),
         );
     }

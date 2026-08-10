@@ -2,36 +2,33 @@
 
 declare(strict_types=1);
 
-namespace Shared\Infrastructure\Bus\Command;
+namespace Shared\Infrastructure\Bus\Query;
 
-use Closure;
 use Psr\Log\LoggerInterface;
-use Shared\Application\Bus\Command\ICommand;
-use Shared\Application\Bus\Command\ICommandMiddleware;
+use Shared\Application\Bus\Query\IQuery;
+use Shared\Application\Bus\Query\IQueryBus;
 use Throwable;
 
-final readonly class LoggingCommandMiddleware implements ICommandMiddleware
+final readonly class LoggingQueryBus implements IQueryBus
 {
     public function __construct(
+        private IQueryBus $inner,
         private LoggerInterface $logger,
     ) {}
 
-    /**
-     * @param  ICommand<mixed>  $command
-     * @param  Closure(ICommand<mixed>): mixed  $next
-     */
-    public function process(ICommand $command, Closure $next): mixed
+    /** @param IQuery<mixed> $query */
+    public function ask(IQuery $query): mixed
     {
-        $context = ['command' => $command::class];
+        $context = ['query' => $query::class];
 
-        $this->logger->info('Command started.', $context);
+        $this->logger->info('Query started.', $context);
 
         $startedAt = hrtime(true);
 
         try {
-            $result = $next($command);
+            $result = $this->inner->ask($query);
         } catch (Throwable $exception) {
-            $this->logger->error('Command failed.', [
+            $this->logger->error('Query failed.', [
                 ...$context,
                 'exception' => $exception::class,
                 'duration_ms' => $this->durationInMs($startedAt),
@@ -41,7 +38,7 @@ final readonly class LoggingCommandMiddleware implements ICommandMiddleware
             throw $exception;
         }
 
-        $this->logger->info('Command completed.', [
+        $this->logger->info('Query completed.', [
             ...$context,
             'duration_ms' => $this->durationInMs($startedAt),
             'outcome' => 'success',
