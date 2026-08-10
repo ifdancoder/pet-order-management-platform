@@ -180,6 +180,7 @@ final class MessagingServiceProvider extends ServiceProvider
                 return new OutboxPublisher(
                     outbox: $application->make(IOutboxRepository::class),
                     messages: $application->make(IMessagePublisher::class),
+                    logger: $application->make(LoggerInterface::class),
                     batchSize: $batchSize,
                     claimTimeoutSeconds: $claimTimeout,
                     initialRetryDelaySeconds: $initialRetryDelay,

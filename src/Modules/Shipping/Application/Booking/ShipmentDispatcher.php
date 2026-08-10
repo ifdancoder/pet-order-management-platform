@@ -7,6 +7,7 @@ namespace Modules\Shipping\Application\Booking;
 use Modules\Shipping\Application\Data\ShipmentDispatchResult;
 use Modules\Shipping\Application\Port\Out\Persistence\IShipmentRepository;
 use Modules\Shipping\Application\Port\Out\Provider\IShippingProvider;
+use Psr\Log\LoggerInterface;
 use Throwable;
 
 final readonly class ShipmentDispatcher
@@ -14,6 +15,7 @@ final readonly class ShipmentDispatcher
     public function __construct(
         private IShipmentRepository $shipments,
         private IShippingProvider $provider,
+        private LoggerInterface $logger,
         private int $batchSize,
         private int $claimTimeoutSeconds,
         private int $maximumAttempts,
@@ -41,6 +43,9 @@ final readonly class ShipmentDispatcher
                     trackingNumber: $result->trackingNumber,
                 );
                 $booked++;
+                $this->logger->info('Shipment booking succeeded.', [
+                    'shipment_id' => $shipment->shipmentId,
+                ]);
             } catch (Throwable $exception) {
                 $terminal = $shipment->attempts >= $this->maximumAttempts;
                 $this->shipments->release(
@@ -51,6 +56,14 @@ final readonly class ShipmentDispatcher
                     terminal: $terminal,
                 );
                 $terminal ? $failed++ : $retrying++;
+                $this->logger->log($terminal ? 'error' : 'warning', sprintf(
+                    'Shipment booking %s.',
+                    $terminal ? 'failed' : 'retrying',
+                ), [
+                    'shipment_id' => $shipment->shipmentId,
+                    'attempts' => $shipment->attempts,
+                    'exception' => $exception::class,
+                ]);
             }
         }
 

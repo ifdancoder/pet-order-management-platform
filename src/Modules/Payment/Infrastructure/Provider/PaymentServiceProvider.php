@@ -42,6 +42,7 @@ use Modules\Payment\Infrastructure\Adapter\Out\Webhook\PaymentWebhookVerifierRes
 use Modules\Payment\Infrastructure\Adapter\Out\Webhook\PayPalPaymentWebhookVerifier;
 use Modules\Payment\Infrastructure\Adapter\Out\Webhook\StripePaymentWebhookVerifier;
 use Modules\Payment\Infrastructure\Queue\ProcessPendingRefundsJob;
+use Psr\Log\LoggerInterface;
 use Shared\Application\Port\In\Messaging\IIntegrationMessageHandler;
 use Shared\Application\Port\Out\Outbox\IOutboxWriter;
 use Shared\Application\Port\Out\Transaction\ITransactionManager;
@@ -180,6 +181,7 @@ final class PaymentServiceProvider extends ServiceProvider
                 gateways: $application->make(IPaymentGatewayResolver::class),
                 transaction: $application->make(ITransactionManager::class),
                 outbox: $application->make(IOutboxWriter::class),
+                logger: $application->make(LoggerInterface::class),
                 batchSize: $this->positiveInt($config, 'payment.refund.batch_size'),
                 claimTimeoutSeconds: $this->positiveInt($config, 'payment.refund.claim_timeout_seconds'),
                 maximumAttempts: $this->positiveInt($config, 'payment.refund.maximum_attempts'),

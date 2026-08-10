@@ -33,6 +33,7 @@ use Modules\Shipping\Infrastructure\Adapter\Out\Persistence\Eloquent\Repository\
 use Modules\Shipping\Infrastructure\Adapter\Out\Provider\FakeShippingProvider;
 use Modules\Shipping\Infrastructure\Adapter\Out\Provider\HttpShippingProvider;
 use Modules\Shipping\Infrastructure\Queue\BookPendingShipmentsJob;
+use Psr\Log\LoggerInterface;
 use Shared\Application\Port\In\Messaging\IIntegrationMessageHandler;
 use Shared\Infrastructure\Bus\HandlerRegistry;
 
@@ -112,6 +113,7 @@ final class ShippingServiceProvider extends ServiceProvider
                 return new ShipmentDispatcher(
                     shipments: $application->make(IShipmentRepository::class),
                     provider: $application->make(IShippingProvider::class),
+                    logger: $application->make(LoggerInterface::class),
                     batchSize: $batchSize,
                     claimTimeoutSeconds: $claimTimeout,
                     maximumAttempts: $maximumAttempts,

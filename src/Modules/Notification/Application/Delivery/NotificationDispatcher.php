@@ -6,6 +6,7 @@ namespace Modules\Notification\Application\Delivery;
 
 use Modules\Notification\Application\Data\NotificationDispatchResult;
 use Modules\Notification\Application\Port\Out\Persistence\INotificationRepository;
+use Psr\Log\LoggerInterface;
 use Throwable;
 
 final readonly class NotificationDispatcher
@@ -13,6 +14,7 @@ final readonly class NotificationDispatcher
     public function __construct(
         private INotificationRepository $notifications,
         private NotificationChannelResolver $channels,
+        private LoggerInterface $logger,
         private int $batchSize,
         private int $claimTimeoutSeconds,
         private int $maximumAttempts,
@@ -39,6 +41,9 @@ final readonly class NotificationDispatcher
                     $notification->claimToken,
                 );
                 $sent++;
+                $this->logger->info('Notification delivery succeeded.', [
+                    'notification_id' => $notification->notificationId,
+                ]);
             } catch (Throwable $exception) {
                 $terminal = $notification->attempts >= $this->maximumAttempts;
                 $this->notifications->release(
@@ -54,6 +59,15 @@ final readonly class NotificationDispatcher
                 } else {
                     $retrying++;
                 }
+
+                $this->logger->log($terminal ? 'error' : 'warning', sprintf(
+                    'Notification delivery %s.',
+                    $terminal ? 'failed' : 'retrying',
+                ), [
+                    'notification_id' => $notification->notificationId,
+                    'attempts' => $notification->attempts,
+                    'exception' => $exception::class,
+                ]);
             }
         }
 

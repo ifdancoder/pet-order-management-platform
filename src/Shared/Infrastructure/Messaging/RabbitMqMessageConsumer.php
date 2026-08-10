@@ -106,8 +106,17 @@ final readonly class RabbitMqMessageConsumer
                 'correlation_id' => $integrationMessage->correlationId ?? $requestId,
             ]);
 
-            $this->messages->consume($consumerName, $integrationMessage);
+            $consumed = $this->messages->consume($consumerName, $integrationMessage);
             $message->ack();
+
+            $this->logger->info(
+                $consumed ? 'Integration message consumed.' : 'Integration message duplicate, skipped.',
+                [
+                    'message_id' => $integrationMessage->messageId,
+                    'message_type' => $integrationMessage->name,
+                    'consumer' => $consumerName,
+                ],
+            );
         } catch (Throwable $exception) {
             $this->logger->error('Integration message processing failed.', [
                 'exception' => $exception,

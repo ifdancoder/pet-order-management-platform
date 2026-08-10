@@ -13,6 +13,8 @@ use Modules\Shipping\Application\Port\Out\Provider\IShippingProvider;
 use Modules\Shipping\Domain\Enum\ShipmentStatus;
 use Modules\Shipping\Domain\Enum\ShippingMethod;
 use Modules\Shipping\Infrastructure\Adapter\Out\Persistence\Eloquent\Model\ShipmentModel;
+use Psr\Log\AbstractLogger;
+use Psr\Log\LoggerInterface;
 use Shared\Application\Bus\Command\ICommandBus;
 use Shared\Application\Messaging\IntegrationMessage;
 
@@ -54,6 +56,19 @@ it('books a pending shipment through the configured provider', function (): void
     expect(ShipmentModel::query()->sole()->tracking_number)->toStartWith('OF');
 });
 
+it('logs a structured event when a shipment is booked', function (): void {
+    app(ICommandBus::class)->dispatch(shipmentCommand());
+    app(PaymentCapturedShipmentHandler::class)->handle(paymentCapturedMessage());
+    $logger = new ShipmentDispatcherTestLogger;
+    app()->instance(LoggerInterface::class, $logger);
+
+    app(ShipmentDispatcher::class)->dispatchPending();
+
+    expect($logger->records)->toHaveCount(1)
+        ->and($logger->records[0]['message'])->toBe('Shipment booking succeeded.')
+        ->and($logger->records[0]['context'])->toHaveKey('shipment_id');
+});
+
 it('does not book a shipment before payment is captured', function (): void {
     app(ICommandBus::class)->dispatch(shipmentCommand());
 
@@ -92,9 +107,11 @@ it('releases a failed booking for a delayed retry', function (): void {
             throw new RuntimeException('Provider unavailable');
         }
     };
+    $logger = new ShipmentDispatcherTestLogger;
     $dispatcher = new ShipmentDispatcher(
         shipments: app(IShipmentRepository::class),
         provider: $provider,
+        logger: $logger,
         batchSize: 10,
         claimTimeoutSeconds: 60,
         maximumAttempts: 3,
@@ -111,7 +128,29 @@ it('releases a failed booking for a delayed retry', function (): void {
         'last_error' => 'RuntimeException: Provider unavailable',
         'available_at' => '2026-09-28 08:00:05',
     ]);
+    expect($logger->records)->toHaveCount(1)
+        ->and($logger->records[0]['message'])->toBe('Shipment booking retrying.')
+        ->and($logger->records[0]['context'])->toHaveKeys(['shipment_id', 'attempts', 'exception']);
 });
+
+final class ShipmentDispatcherTestLogger extends AbstractLogger
+{
+    /** @var list<array{level: mixed, message: string, context: array<string, mixed>}> */
+    public array $records = [];
+
+    /** @param array<string, mixed> $context */
+    public function log(
+        mixed $level,
+        Stringable|string $message,
+        array $context = [],
+    ): void {
+        $this->records[] = [
+            'level' => $level,
+            'message' => (string) $message,
+            'context' => $context,
+        ];
+    }
+}
 
 function shipmentCommand(): CreateShipmentCommand
 {

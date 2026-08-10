@@ -19,6 +19,7 @@ use Modules\Notification\Infrastructure\Adapter\Out\Delivery\LaravelEmailNotific
 use Modules\Notification\Infrastructure\Adapter\Out\Identity\LaravelNotificationIdGenerator;
 use Modules\Notification\Infrastructure\Adapter\Out\Persistence\Eloquent\Repository\EloquentNotificationRepository;
 use Modules\Notification\Infrastructure\Queue\DeliverPendingNotificationsJob;
+use Psr\Log\LoggerInterface;
 use Shared\Application\Port\In\Messaging\IIntegrationMessageHandler;
 
 final class NotificationServiceProvider extends ServiceProvider
@@ -81,6 +82,7 @@ final class NotificationServiceProvider extends ServiceProvider
                 return new NotificationDispatcher(
                     notifications: $application->make(INotificationRepository::class),
                     channels: $application->make(NotificationChannelResolver::class),
+                    logger: $application->make(LoggerInterface::class),
                     batchSize: $batchSize,
                     claimTimeoutSeconds: $claimTimeout,
                     maximumAttempts: $maximumAttempts,

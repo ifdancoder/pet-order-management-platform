@@ -8,6 +8,7 @@ use Modules\Payment\Application\Data\RefundDispatchResult;
 use Modules\Payment\Application\Event\RefundIntegrationEvent;
 use Modules\Payment\Application\Port\Out\Gateway\IPaymentGatewayResolver;
 use Modules\Payment\Application\Port\Out\Persistence\IRefundRepository;
+use Psr\Log\LoggerInterface;
 use Shared\Application\Port\Out\Outbox\IOutboxWriter;
 use Shared\Application\Port\Out\Transaction\ITransactionManager;
 use Throwable;
@@ -19,6 +20,7 @@ final readonly class RefundDispatcher
         private IPaymentGatewayResolver $gateways,
         private ITransactionManager $transaction,
         private IOutboxWriter $outbox,
+        private LoggerInterface $logger,
         private int $batchSize,
         private int $claimTimeoutSeconds,
         private int $maximumAttempts,
@@ -60,6 +62,9 @@ final readonly class RefundDispatcher
                     ));
                 });
                 $completed++;
+                $this->logger->info('Refund dispatch succeeded.', [
+                    'refund_id' => $refund->refundId,
+                ]);
             } catch (Throwable $exception) {
                 $terminal = $refund->attempts >= $this->maximumAttempts;
                 $this->refunds->release(
@@ -70,6 +75,14 @@ final readonly class RefundDispatcher
                     terminal: $terminal,
                 );
                 $terminal ? $failed++ : $retrying++;
+                $this->logger->log($terminal ? 'error' : 'warning', sprintf(
+                    'Refund dispatch %s.',
+                    $terminal ? 'failed' : 'retrying',
+                ), [
+                    'refund_id' => $refund->refundId,
+                    'attempts' => $refund->attempts,
+                    'exception' => $exception::class,
+                ]);
             }
         }
 

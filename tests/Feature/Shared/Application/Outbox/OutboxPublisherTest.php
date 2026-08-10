@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Psr\Log\AbstractLogger;
+use Psr\Log\LoggerInterface;
 use Shared\Application\Event\IIntegrationEvent;
 use Shared\Application\Outbox\OutboxMessage;
 use Shared\Application\Outbox\OutboxPublisher;
@@ -40,6 +42,50 @@ it('publishes claimed messages and marks them only after success', function (): 
         ->value('last_error'))
         ->toContain('Publisher test failure.');
 });
+
+it('logs a structured event for each publish outcome', function (): void {
+    $writer = app(IOutboxWriter::class);
+    $writer->record(new PublisherTestIntegrationEvent('payment.authorized.v1'));
+    $writer->record(new PublisherTestIntegrationEvent('payment.failed.v1'));
+    app()->instance(
+        IMessagePublisher::class,
+        new RecordingMessagePublisher('payment.failed.v1'),
+    );
+    $logger = new OutboxPublisherTestLogger;
+    app()->instance(LoggerInterface::class, $logger);
+
+    app(OutboxPublisher::class)->publishPending();
+
+    $byEvent = [];
+    foreach ($logger->records as $record) {
+        $byEvent[$record['context']['event_name']] = $record;
+    }
+
+    expect($logger->records)->toHaveCount(2)
+        ->and($byEvent['payment.authorized.v1']['message'])->toBe('Outbox publish succeeded.')
+        ->and($byEvent['payment.authorized.v1']['context'])->toHaveKey('message_id')
+        ->and($byEvent['payment.failed.v1']['message'])->toBe('Outbox publish failed.')
+        ->and($byEvent['payment.failed.v1']['context'])->toHaveKeys(['message_id', 'exception']);
+});
+
+final class OutboxPublisherTestLogger extends AbstractLogger
+{
+    /** @var list<array{level: mixed, message: string, context: array<string, mixed>}> */
+    public array $records = [];
+
+    /** @param array<string, mixed> $context */
+    public function log(
+        mixed $level,
+        Stringable|string $message,
+        array $context = [],
+    ): void {
+        $this->records[] = [
+            'level' => $level,
+            'message' => (string) $message,
+            'context' => $context,
+        ];
+    }
+}
 
 final readonly class PublisherTestIntegrationEvent implements IIntegrationEvent
 {

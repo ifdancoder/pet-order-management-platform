@@ -15,6 +15,7 @@ use Modules\Notification\Domain\Enum\NotificationChannel;
 use Modules\Notification\Domain\Enum\NotificationStatus;
 use Modules\Notification\Infrastructure\Adapter\Out\Persistence\Eloquent\Model\NotificationDeliveryModel;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
+use Psr\Log\LoggerInterface;
 use Shared\Application\Outbox\OutboxPublisher;
 use Shared\Infrastructure\Messaging\RabbitMqMessageConsumer;
 
@@ -80,6 +81,7 @@ it('keeps registration committed when welcome email delivery fails', function ()
     $dispatcher = new NotificationDispatcher(
         notifications: app(INotificationRepository::class),
         channels: new NotificationChannelResolver([$channel]),
+        logger: app(LoggerInterface::class),
         batchSize: 10,
         claimTimeoutSeconds: 60,
         maximumAttempts: 3,

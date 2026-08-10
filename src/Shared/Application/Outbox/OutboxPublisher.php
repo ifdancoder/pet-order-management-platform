@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Shared\Application\Outbox;
 
+use Psr\Log\LoggerInterface;
 use Shared\Application\Port\Out\Messaging\IMessagePublisher;
 use Shared\Application\Port\Out\Outbox\IOutboxRepository;
 use Throwable;
@@ -13,6 +14,7 @@ final readonly class OutboxPublisher
     public function __construct(
         private IOutboxRepository $outbox,
         private IMessagePublisher $messages,
+        private LoggerInterface $logger,
         private int $batchSize,
         private int $claimTimeoutSeconds,
         private int $initialRetryDelaySeconds,
@@ -36,6 +38,10 @@ final readonly class OutboxPublisher
                     $message->claimToken,
                 );
                 $published++;
+                $this->logger->info('Outbox publish succeeded.', [
+                    'message_id' => $message->messageId,
+                    'event_name' => $message->eventName,
+                ]);
             } catch (Throwable $exception) {
                 $this->outbox->release(
                     messageId: $message->messageId,
@@ -44,6 +50,11 @@ final readonly class OutboxPublisher
                     delaySeconds: $this->retryDelay($message->attempts),
                 );
                 $failed++;
+                $this->logger->error('Outbox publish failed.', [
+                    'message_id' => $message->messageId,
+                    'event_name' => $message->eventName,
+                    'exception' => $exception::class,
+                ]);
             }
         }
 

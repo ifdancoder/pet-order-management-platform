@@ -9,11 +9,74 @@ use Illuminate\Support\Str;
 use Modules\Order\Domain\Enum\OrderStatus;
 use Modules\Order\Infrastructure\Adapter\Out\Persistence\Eloquent\Model\OrderModel;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
+use Psr\Log\AbstractLogger;
+use Psr\Log\LoggerInterface;
 use Shared\Application\Outbox\OutboxMessage;
 use Shared\Application\Port\Out\Messaging\IMessagePublisher;
 use Shared\Infrastructure\Messaging\RabbitMqMessageConsumer;
 
 uses(DatabaseMigrations::class);
+
+it('logs a consumed event and a duplicate event for the same message', function (): void {
+    $logger = new RabbitMqMessageConsumerTestLogger;
+    app()->forgetInstance(RabbitMqMessageConsumer::class);
+    app()->instance(LoggerInterface::class, $logger);
+    $consumer = app(RabbitMqMessageConsumer::class);
+    $consumer->consumeOne('order-payment-status');
+    rabbitMqConsumerTestPurgeQueue();
+    $logger->records = [];
+    $order = OrderModel::factory()->create([
+        'status' => OrderStatus::Placed->value,
+    ]);
+    $message = new OutboxMessage(
+        messageId: '018f22e2-7c2a-7a33-8c4c-4ea690ad4f8d',
+        eventName: 'payment.captured.v1',
+        aggregateId: '018f22e2-7c2a-7a33-8c4c-4ea690ad4f8e',
+        payload: ['order_id' => $order->getKey()],
+        occurredAt: new DateTimeImmutable('2026-09-28T05:00:00+00:00'),
+        claimToken: '018f22e2-7c2a-7a33-8c4c-4ea690ad4f8f',
+        attempts: 1,
+    );
+    $publisher = app(IMessagePublisher::class);
+
+    $publisher->publish($message);
+    $consumer->consumeOne('order-payment-status');
+    $publisher->publish($message);
+    $consumer->consumeOne('order-payment-status');
+
+    expect($logger->records)->toHaveCount(2)
+        ->and($logger->records[0]['message'])->toBe('Integration message consumed.')
+        ->and($logger->records[0]['context'])->toBe([
+            'message_id' => '018f22e2-7c2a-7a33-8c4c-4ea690ad4f8d',
+            'message_type' => 'payment.captured.v1',
+            'consumer' => 'order-payment-status',
+        ])
+        ->and($logger->records[1]['message'])->toBe('Integration message duplicate, skipped.')
+        ->and($logger->records[1]['context'])->toBe([
+            'message_id' => '018f22e2-7c2a-7a33-8c4c-4ea690ad4f8d',
+            'message_type' => 'payment.captured.v1',
+            'consumer' => 'order-payment-status',
+        ]);
+});
+
+final class RabbitMqMessageConsumerTestLogger extends AbstractLogger
+{
+    /** @var list<array{level: mixed, message: string, context: array<string, mixed>}> */
+    public array $records = [];
+
+    /** @param array<string, mixed> $context */
+    public function log(
+        mixed $level,
+        Stringable|string $message,
+        array $context = [],
+    ): void {
+        $this->records[] = [
+            'level' => $level,
+            'message' => (string) $message,
+            'context' => $context,
+        ];
+    }
+}
 
 it('restores the correlation id carried on the message before handling', function (): void {
     $consumer = app(RabbitMqMessageConsumer::class);
