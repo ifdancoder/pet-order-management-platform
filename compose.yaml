@@ -71,6 +71,8 @@ services:
       - .:/var/www/html
       - composer_vendor:/var/www/html/vendor
     depends_on:
+      app:
+        condition: service_healthy
       postgres:
         condition: service_healthy
       redis:
@@ -100,6 +102,8 @@ services:
       - .:/var/www/html
       - composer_vendor:/var/www/html/vendor
     depends_on:
+      app:
+        condition: service_healthy
       postgres:
         condition: service_healthy
       redis:
@@ -216,6 +220,8 @@ services:
       - .:/var/www/html
       - composer_vendor:/var/www/html/vendor
     depends_on:
+      app:
+        condition: service_healthy
       postgres:
         condition: service_healthy
       rabbitmq:
@@ -245,6 +251,8 @@ services:
       - .:/var/www/html
       - composer_vendor:/var/www/html/vendor
     depends_on:
+      app:
+        condition: service_healthy
       postgres:
         condition: service_healthy
       rabbitmq:
