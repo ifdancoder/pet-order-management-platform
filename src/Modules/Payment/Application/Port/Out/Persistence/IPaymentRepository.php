@@ -19,6 +19,8 @@ interface IPaymentRepository
 
     public function findByIdForUpdate(PaymentId $paymentId): ?Payment;
 
+    public function findCapturedByOrderIdForUpdate(string $orderId): ?Payment;
+
     public function findByProviderPaymentIdForUpdate(
         PaymentProvider $provider,
         string $providerPaymentId,

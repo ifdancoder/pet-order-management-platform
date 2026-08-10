@@ -7,6 +7,7 @@ namespace Modules\Payment\Infrastructure\Adapter\Out\Persistence\Eloquent\Reposi
 use Modules\Payment\Application\Port\Out\Persistence\IPaymentRepository;
 use Modules\Payment\Domain\Entity\Payment;
 use Modules\Payment\Domain\Enum\PaymentProvider;
+use Modules\Payment\Domain\Enum\PaymentStatus;
 use Modules\Payment\Domain\ValueObject\IdempotencyKey;
 use Modules\Payment\Domain\ValueObject\PaymentId;
 use Modules\Payment\Infrastructure\Adapter\Out\Persistence\Eloquent\Mapper\PaymentMapper;
@@ -46,6 +47,18 @@ final readonly class EloquentPaymentRepository implements IPaymentRepository
     {
         $model = PaymentModel::query()
             ->whereKey($paymentId->value())
+            ->lockForUpdate()
+            ->first();
+
+        return $model === null ? null : $this->mapper->toDomain($model);
+    }
+
+    public function findCapturedByOrderIdForUpdate(string $orderId): ?Payment
+    {
+        $model = PaymentModel::query()
+            ->where('order_id', $orderId)
+            ->where('status', PaymentStatus::Captured->value)
+            ->latest('created_at')
             ->lockForUpdate()
             ->first();
 

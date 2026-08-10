@@ -19,6 +19,7 @@ use Modules\Return\Application\Command\RejectReturn\RejectReturnCommand;
 use Modules\Return\Application\Command\RejectReturn\RejectReturnHandler;
 use Modules\Return\Application\Command\RequestReturn\RequestReturnCommand;
 use Modules\Return\Application\Command\RequestReturn\RequestReturnHandler;
+use Modules\Return\Application\Messaging\PaymentRefundedReturnHandler;
 use Modules\Return\Application\Port\Out\Customer\IReturnCustomerGateway;
 use Modules\Return\Application\Port\Out\Identity\IReturnIdGenerator;
 use Modules\Return\Application\Port\Out\Order\IReturnOrderGateway;
@@ -36,6 +37,7 @@ use Modules\Return\Infrastructure\Adapter\Out\Identity\LaravelReturnIdGenerator;
 use Modules\Return\Infrastructure\Adapter\Out\Order\OrderReturnGateway;
 use Modules\Return\Infrastructure\Adapter\Out\Persistence\Eloquent\Repository\EloquentReturnRepository;
 use Modules\Return\Infrastructure\Adapter\Out\Time\SystemReturnClock;
+use Shared\Application\Port\In\Messaging\IIntegrationMessageHandler;
 use Shared\Infrastructure\Bus\HandlerRegistry;
 
 final class ReturnServiceProvider extends ServiceProvider
@@ -62,6 +64,7 @@ final class ReturnServiceProvider extends ServiceProvider
                 ]),
             );
         });
+        $this->app->tag(PaymentRefundedReturnHandler::class, IIntegrationMessageHandler::class);
     }
 
     public function boot(): void

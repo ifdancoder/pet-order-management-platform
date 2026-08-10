@@ -3,6 +3,13 @@
 declare(strict_types=1);
 
 return [
+    'refund' => [
+        'batch_size' => (int) env('PAYMENT_REFUND_BATCH_SIZE', 50),
+        'claim_timeout_seconds' => (int) env('PAYMENT_REFUND_CLAIM_TIMEOUT_SECONDS', 60),
+        'maximum_attempts' => (int) env('PAYMENT_REFUND_MAXIMUM_ATTEMPTS', 5),
+        'initial_retry_delay_seconds' => (int) env('PAYMENT_REFUND_INITIAL_RETRY_DELAY_SECONDS', 5),
+        'maximum_retry_delay_seconds' => (int) env('PAYMENT_REFUND_MAXIMUM_RETRY_DELAY_SECONDS', 300),
+    ],
     'fake' => [
         'decline' => (bool) env('PAYMENT_FAKE_DECLINE', false),
     ],

@@ -47,5 +47,21 @@ return [
             'dead_letter_exchange' => env('RABBITMQ_DEAD_LETTER_EXCHANGE', 'orderflow.dead'),
             'prefetch_count' => (int) env('RABBITMQ_CONSUMER_PREFETCH_COUNT', 10),
         ],
+        'payment-return-received' => [
+            'queue' => env('RABBITMQ_PAYMENT_RETURN_QUEUE', 'orderflow.payment.return-received'),
+            'bindings' => [
+                'return.received.v1',
+            ],
+            'dead_letter_exchange' => env('RABBITMQ_DEAD_LETTER_EXCHANGE', 'orderflow.dead'),
+            'prefetch_count' => (int) env('RABBITMQ_CONSUMER_PREFETCH_COUNT', 10),
+        ],
+        'return-payment-refunded' => [
+            'queue' => env('RABBITMQ_RETURN_PAYMENT_QUEUE', 'orderflow.return.payment-refunded'),
+            'bindings' => [
+                'payment.refunded.v1',
+            ],
+            'dead_letter_exchange' => env('RABBITMQ_DEAD_LETTER_EXCHANGE', 'orderflow.dead'),
+            'prefetch_count' => (int) env('RABBITMQ_CONSUMER_PREFETCH_COUNT', 10),
+        ],
     ],
 ];
