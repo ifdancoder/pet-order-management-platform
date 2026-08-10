@@ -8,6 +8,7 @@ use Modules\Notification\Infrastructure\Provider\NotificationServiceProvider;
 use Modules\Order\Infrastructure\Provider\OrderServiceProvider;
 use Modules\Payment\Infrastructure\Provider\PaymentServiceProvider;
 use Modules\Promotion\Infrastructure\Provider\PromotionServiceProvider;
+use Modules\Return\Infrastructure\Provider\ReturnServiceProvider;
 use Modules\Shipping\Infrastructure\Provider\ShippingServiceProvider;
 use Shared\Infrastructure\Provider\BusServiceProvider;
 use Shared\Infrastructure\Provider\MessagingServiceProvider;
@@ -26,4 +27,5 @@ return [
     PaymentServiceProvider::class,
     NotificationServiceProvider::class,
     ShippingServiceProvider::class,
+    ReturnServiceProvider::class,
 ];

@@ -7,6 +7,7 @@ namespace Modules\Order\Infrastructure\Adapter\Out\Persistence\Eloquent\Model;
 use Database\Factories\OrderModelFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 final class OrderModel extends Model
 {
@@ -37,6 +38,12 @@ final class OrderModel extends Model
             'discount_amount' => 'integer',
             'shipping_cost_amount' => 'integer',
         ];
+    }
+
+    /** @return HasMany<OrderItemModel, $this> */
+    public function items(): HasMany
+    {
+        return $this->hasMany(OrderItemModel::class, 'order_id');
     }
 
     protected static function newFactory(): OrderModelFactory

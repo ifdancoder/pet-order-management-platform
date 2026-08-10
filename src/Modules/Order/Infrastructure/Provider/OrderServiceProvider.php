@@ -26,6 +26,7 @@ use Modules\Order\Application\Command\TransitionOrder\TransitionOrderHandler;
 use Modules\Order\Application\Messaging\PaymentStatusChangedHandler;
 use Modules\Order\Application\Payment\OrderPayment;
 use Modules\Order\Application\Port\In\IOrderPayment;
+use Modules\Order\Application\Port\In\IOrderReturnLookup;
 use Modules\Order\Application\Port\Out\Checkout\ICustomerCheckoutGateway;
 use Modules\Order\Application\Port\Out\Checkout\IInventoryCheckoutGateway;
 use Modules\Order\Application\Port\Out\Checkout\IPromotionCheckoutGateway;
@@ -42,6 +43,7 @@ use Modules\Order\Infrastructure\Adapter\Out\Checkout\ShippingCheckoutGateway;
 use Modules\Order\Infrastructure\Adapter\Out\Identity\LaravelOrderIdGenerator;
 use Modules\Order\Infrastructure\Adapter\Out\Persistence\Eloquent\Repository\EloquentCheckoutRepository;
 use Modules\Order\Infrastructure\Adapter\Out\Persistence\Eloquent\Repository\EloquentOrderRepository;
+use Modules\Order\Infrastructure\Adapter\Out\Return\EloquentOrderReturnLookup;
 use Shared\Application\Port\In\Messaging\IIntegrationMessageHandler;
 use Shared\Infrastructure\Bus\HandlerRegistry;
 
@@ -57,6 +59,7 @@ final class OrderServiceProvider extends ServiceProvider
         $this->app->bind(IPromotionCheckoutGateway::class, PromotionCheckoutGateway::class);
         $this->app->bind(IShippingCheckoutGateway::class, ShippingCheckoutGateway::class);
         $this->app->bind(IOrderPayment::class, OrderPayment::class);
+        $this->app->bind(IOrderReturnLookup::class, EloquentOrderReturnLookup::class);
         $this->app->tag(
             PaymentStatusChangedHandler::class,
             IIntegrationMessageHandler::class,

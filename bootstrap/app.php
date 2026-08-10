@@ -24,6 +24,11 @@ use Modules\Payment\Application\Exception\PaymentGatewayUnavailable;
 use Modules\Payment\Application\Exception\PaymentIdempotencyConflict;
 use Modules\Payment\Application\Exception\PaymentNotAllowed;
 use Modules\Payment\Application\Exception\PaymentNotFound;
+use Modules\Return\Application\Exception\ReturnAlreadyExists;
+use Modules\Return\Application\Exception\ReturnNotFound;
+use Modules\Return\Application\Exception\ReturnOrderNotFound;
+use Modules\Return\Domain\Exception\InvalidReturnStatusTransition;
+use Modules\Return\Domain\Exception\ReturnNotEligible;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -174,5 +179,41 @@ return Application::configure(basePath: dirname(__DIR__))
                     'message' => 'Payment was not found.',
                 ],
             ], 404),
+        );
+
+        $exceptions->render(
+            fn (ReturnNotFound|ReturnOrderNotFound $exception) => response()->json([
+                'error' => [
+                    'code' => 'return_not_found',
+                    'message' => 'Return or eligible order was not found.',
+                ],
+            ], 404),
+        );
+
+        $exceptions->render(
+            fn (ReturnAlreadyExists $exception) => response()->json([
+                'error' => [
+                    'code' => 'return_already_exists',
+                    'message' => 'A return already exists for this order.',
+                ],
+            ], 409),
+        );
+
+        $exceptions->render(
+            fn (ReturnNotEligible $exception) => response()->json([
+                'error' => [
+                    'code' => 'return_not_eligible',
+                    'message' => $exception->getMessage(),
+                ],
+            ], 422),
+        );
+
+        $exceptions->render(
+            fn (InvalidReturnStatusTransition $exception) => response()->json([
+                'error' => [
+                    'code' => 'invalid_return_status_transition',
+                    'message' => $exception->getMessage(),
+                ],
+            ], 409),
         );
     })->create();
