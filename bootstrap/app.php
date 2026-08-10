@@ -29,6 +29,7 @@ use Modules\Return\Application\Exception\ReturnNotFound;
 use Modules\Return\Application\Exception\ReturnOrderNotFound;
 use Modules\Return\Domain\Exception\InvalidReturnStatusTransition;
 use Modules\Return\Domain\Exception\ReturnNotEligible;
+use Shared\Presentation\Http\Middleware\ResolveCorrelationContext;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -37,6 +38,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'identity.auth' => AuthenticateAccessToken::class,
+        ]);
+
+        $middleware->api(prepend: [
+            ResolveCorrelationContext::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
