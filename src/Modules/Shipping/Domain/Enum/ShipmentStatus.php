@@ -6,6 +6,7 @@ namespace Modules\Shipping\Domain\Enum;
 
 enum ShipmentStatus: string
 {
+    case AwaitingPayment = 'awaiting_payment';
     case Pending = 'pending';
     case Booked = 'booked';
     case Failed = 'failed';

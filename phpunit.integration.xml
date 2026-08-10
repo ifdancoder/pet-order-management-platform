@@ -32,6 +32,7 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="RABBITMQ_ORDER_QUEUE" value="orderflow.test.order.payment-status" force="true"/>
         <env name="RABBITMQ_NOTIFICATION_QUEUE" value="orderflow.test.notification.user-registered" force="true"/>
+        <env name="RABBITMQ_SHIPPING_QUEUE" value="orderflow.test.shipping.payment-captured" force="true"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
@@ -51,6 +52,7 @@
         <server name="QUEUE_CONNECTION" value="sync"/>
         <server name="RABBITMQ_ORDER_QUEUE" value="orderflow.test.order.payment-status"/>
         <server name="RABBITMQ_NOTIFICATION_QUEUE" value="orderflow.test.notification.user-registered"/>
+        <server name="RABBITMQ_SHIPPING_QUEUE" value="orderflow.test.shipping.payment-captured"/>
         <server name="SESSION_DRIVER" value="array"/>
         <server name="PULSE_ENABLED" value="false"/>
         <server name="TELESCOPE_ENABLED" value="false"/>

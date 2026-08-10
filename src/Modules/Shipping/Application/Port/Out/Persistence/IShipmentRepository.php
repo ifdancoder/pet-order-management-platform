@@ -13,6 +13,8 @@ interface IShipmentRepository
 
     public function findByOrderId(string $orderId): ?Shipment;
 
+    public function findByOrderIdForUpdate(string $orderId): ?Shipment;
+
     /** @return list<ShipmentBookingAttempt> */
     public function claimBatch(int $limit, int $claimTimeoutSeconds): array;
 

@@ -7,12 +7,14 @@ use Modules\Shipping\Application\Booking\ShipmentDispatcher;
 use Modules\Shipping\Application\Command\CreateShipment\CreateShipmentCommand;
 use Modules\Shipping\Application\Data\ShipmentBookingAttempt;
 use Modules\Shipping\Application\Data\ShipmentBookingResult;
+use Modules\Shipping\Application\Messaging\PaymentCapturedShipmentHandler;
 use Modules\Shipping\Application\Port\Out\Persistence\IShipmentRepository;
 use Modules\Shipping\Application\Port\Out\Provider\IShippingProvider;
 use Modules\Shipping\Domain\Enum\ShipmentStatus;
 use Modules\Shipping\Domain\Enum\ShippingMethod;
 use Modules\Shipping\Infrastructure\Adapter\Out\Persistence\Eloquent\Model\ShipmentModel;
 use Shared\Application\Bus\Command\ICommandBus;
+use Shared\Application\Messaging\IntegrationMessage;
 
 uses(LazilyRefreshDatabase::class);
 
@@ -29,13 +31,14 @@ it('creates one pending shipment per order', function (): void {
         'id' => $first->id()->value(),
         'order_id' => $command->orderId,
         'method' => ShippingMethod::Courier->value,
-        'status' => ShipmentStatus::Pending->value,
+        'status' => ShipmentStatus::AwaitingPayment->value,
         'cost_amount' => 650,
     ]);
 });
 
 it('books a pending shipment through the configured provider', function (): void {
     $shipment = app(ICommandBus::class)->dispatch(shipmentCommand());
+    app(PaymentCapturedShipmentHandler::class)->handle(paymentCapturedMessage());
 
     $result = app(ShipmentDispatcher::class)->dispatchPending();
 
@@ -51,9 +54,37 @@ it('books a pending shipment through the configured provider', function (): void
     expect(ShipmentModel::query()->sole()->tracking_number)->toStartWith('OF');
 });
 
+it('does not book a shipment before payment is captured', function (): void {
+    app(ICommandBus::class)->dispatch(shipmentCommand());
+
+    $result = app(ShipmentDispatcher::class)->dispatchPending();
+
+    expect($result->claimed)->toBe(0)
+        ->and($result->booked)->toBe(0);
+    $this->assertDatabaseHas('shipments', [
+        'status' => ShipmentStatus::AwaitingPayment->value,
+        'attempts' => 0,
+        'provider_shipment_id' => null,
+    ]);
+});
+
+it('handles repeated payment capture facts without resetting shipment state', function (): void {
+    app(ICommandBus::class)->dispatch(shipmentCommand());
+    $handler = app(PaymentCapturedShipmentHandler::class);
+
+    $handler->handle(paymentCapturedMessage());
+    $handler->handle(paymentCapturedMessage());
+
+    $this->assertDatabaseHas('shipments', [
+        'status' => ShipmentStatus::Pending->value,
+        'attempts' => 0,
+    ]);
+});
+
 it('releases a failed booking for a delayed retry', function (): void {
     $this->travelTo('2026-09-28 08:00:00');
     app(ICommandBus::class)->dispatch(shipmentCommand());
+    app(PaymentCapturedShipmentHandler::class)->handle(paymentCapturedMessage());
     $provider = new class implements IShippingProvider
     {
         public function book(ShipmentBookingAttempt $shipment): ShipmentBookingResult
@@ -97,5 +128,16 @@ function shipmentCommand(): CreateShipmentCommand
         weightGrams: 1000,
         costAmount: 650,
         currency: 'USD',
+    );
+}
+
+function paymentCapturedMessage(): IntegrationMessage
+{
+    return new IntegrationMessage(
+        messageId: '018f22e2-7c2a-7a33-8c4c-4ea690ad4f21',
+        name: 'payment.captured.v1',
+        occurredAt: new DateTimeImmutable('2026-09-28T08:00:00+00:00'),
+        aggregateId: '018f22e2-7c2a-7a33-8c4c-4ea690ad4f22',
+        data: ['order_id' => '018f22e2-7c2a-7a33-8c4c-4ea690ad4f19'],
     );
 }

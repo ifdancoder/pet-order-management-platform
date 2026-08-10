@@ -28,7 +28,7 @@ final readonly class CreateShipmentHandler
                 return $existing;
             }
 
-            $shipment = Shipment::pending(
+            $shipment = Shipment::awaitingPayment(
                 id: $this->ids->generate(),
                 orderId: $command->orderId,
                 method: $command->method,

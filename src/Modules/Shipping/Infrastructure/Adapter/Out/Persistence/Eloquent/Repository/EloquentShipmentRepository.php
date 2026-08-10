@@ -46,6 +46,16 @@ final readonly class EloquentShipmentRepository implements IShipmentRepository
         return $model === null ? null : $this->mapper->toDomain($model);
     }
 
+    public function findByOrderIdForUpdate(string $orderId): ?Shipment
+    {
+        $model = ShipmentModel::query()
+            ->where('order_id', $orderId)
+            ->lockForUpdate()
+            ->first();
+
+        return $model === null ? null : $this->mapper->toDomain($model);
+    }
+
     public function claimBatch(int $limit, int $claimTimeoutSeconds): array
     {
         if ($limit < 1 || $claimTimeoutSeconds < 1) {

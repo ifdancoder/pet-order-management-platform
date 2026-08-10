@@ -39,5 +39,13 @@ return [
             'dead_letter_exchange' => env('RABBITMQ_DEAD_LETTER_EXCHANGE', 'orderflow.dead'),
             'prefetch_count' => (int) env('RABBITMQ_CONSUMER_PREFETCH_COUNT', 10),
         ],
+        'shipping-payment-captured' => [
+            'queue' => env('RABBITMQ_SHIPPING_QUEUE', 'orderflow.shipping.payment-captured'),
+            'bindings' => [
+                'payment.captured.v1',
+            ],
+            'dead_letter_exchange' => env('RABBITMQ_DEAD_LETTER_EXCHANGE', 'orderflow.dead'),
+            'prefetch_count' => (int) env('RABBITMQ_CONSUMER_PREFETCH_COUNT', 10),
+        ],
     ],
 ];

@@ -13,6 +13,7 @@ use LogicException;
 use Modules\Shipping\Application\Booking\ShipmentDispatcher;
 use Modules\Shipping\Application\Command\CreateShipment\CreateShipmentCommand;
 use Modules\Shipping\Application\Command\CreateShipment\CreateShipmentHandler;
+use Modules\Shipping\Application\Messaging\PaymentCapturedShipmentHandler;
 use Modules\Shipping\Application\Port\In\IShippingRateCalculator;
 use Modules\Shipping\Application\Port\Out\Identity\IShipmentIdGenerator;
 use Modules\Shipping\Application\Port\Out\Persistence\IShipmentRepository;
@@ -32,6 +33,7 @@ use Modules\Shipping\Infrastructure\Adapter\Out\Persistence\Eloquent\Repository\
 use Modules\Shipping\Infrastructure\Adapter\Out\Provider\FakeShippingProvider;
 use Modules\Shipping\Infrastructure\Adapter\Out\Provider\HttpShippingProvider;
 use Modules\Shipping\Infrastructure\Queue\BookPendingShipmentsJob;
+use Shared\Application\Port\In\Messaging\IIntegrationMessageHandler;
 use Shared\Infrastructure\Bus\HandlerRegistry;
 
 final class ShippingServiceProvider extends ServiceProvider
@@ -74,6 +76,10 @@ final class ShippingServiceProvider extends ServiceProvider
         );
         $this->app->bind(IShipmentIdGenerator::class, LaravelShipmentIdGenerator::class);
         $this->app->bind(IShipmentRepository::class, EloquentShipmentRepository::class);
+        $this->app->tag(
+            PaymentCapturedShipmentHandler::class,
+            IIntegrationMessageHandler::class,
+        );
         $this->app->singleton(
             IShippingProvider::class,
             function (Application $application): IShippingProvider {

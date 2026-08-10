@@ -29,7 +29,7 @@ final class Shipment
         }
     }
 
-    public static function pending(
+    public static function awaitingPayment(
         ShipmentId $id,
         string $orderId,
         ShippingMethod $method,
@@ -44,8 +44,20 @@ final class Shipment
             address: $address,
             weightGrams: $weightGrams,
             cost: $cost,
-            status: ShipmentStatus::Pending,
+            status: ShipmentStatus::AwaitingPayment,
         );
+    }
+
+    public function markReadyForBooking(): void
+    {
+        if ($this->status !== ShipmentStatus::AwaitingPayment) {
+            throw InvalidShipmentTransition::from(
+                $this->status,
+                'prepare for booking',
+            );
+        }
+
+        $this->status = ShipmentStatus::Pending;
     }
 
     public function book(string $providerShipmentId, string $trackingNumber): void

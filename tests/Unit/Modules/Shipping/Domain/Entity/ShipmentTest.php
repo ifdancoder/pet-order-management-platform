@@ -20,6 +20,14 @@ it('moves a pending shipment to booked with provider references', function (): v
         ->and($shipment->trackingNumber())->toBe('TRACK-1');
 });
 
+it('waits for payment before becoming available for booking', function (): void {
+    $shipment = awaitingPaymentShipment();
+
+    $shipment->markReadyForBooking();
+
+    expect($shipment->status())->toBe(ShipmentStatus::Pending);
+});
+
 it('does not book a terminal shipment twice', function (): void {
     $shipment = pendingShipment();
     $shipment->fail();
@@ -31,7 +39,15 @@ it('does not book a terminal shipment twice', function (): void {
 
 function pendingShipment(): Shipment
 {
-    return Shipment::pending(
+    $shipment = awaitingPaymentShipment();
+    $shipment->markReadyForBooking();
+
+    return $shipment;
+}
+
+function awaitingPaymentShipment(): Shipment
+{
+    return Shipment::awaitingPayment(
         id: new ShipmentId('018f22e2-7c2a-7a33-8c4c-4ea690ad4f18'),
         orderId: '018f22e2-7c2a-7a33-8c4c-4ea690ad4f19',
         method: ShippingMethod::Courier,
