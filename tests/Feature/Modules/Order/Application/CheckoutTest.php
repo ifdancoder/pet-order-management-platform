@@ -121,7 +121,7 @@ it('adds a shipping quote and creates a shipment atomically', function (): void 
         'order_id' => $result->orderId,
         'method' => 'courier',
         'cost_amount' => 650,
-        'status' => 'pending',
+        'status' => 'awaiting_payment',
     ]);
 });
 
