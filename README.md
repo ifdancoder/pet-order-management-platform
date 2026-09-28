@@ -1,5 +1,7 @@
 # OrderFlow
 
+*[Русская версия](README.ru.md)*
+
 OrderFlow is an internal order processing and fulfillment platform implemented as a Laravel modular monolith. It exposes a JSON HTTP API for customer accounts, orders, payments, and returns, and coordinates fulfillment work (payments, shipments, notifications) through an internal event bus backed by RabbitMQ.
 
 ## Features
@@ -16,7 +18,24 @@ OrderFlow is an internal order processing and fulfillment platform implemented a
 - Return requests with eligibility checks (order status, return window, purchased quantities).
 - Request/correlation IDs propagated from HTTP requests through the command bus, outbox, and RabbitMQ consumers into structured logs.
 
-## Architecture
+## Tech Stack
+
+- PHP 8.3+ (the Docker image runs PHP 8.5)
+- Laravel 13
+- PostgreSQL (application database and integration test target)
+- SQLite in memory (default test database for unit and feature tests)
+- Redis (cache and session store)
+- RabbitMQ (integration event transport)
+- `lcobucci/jwt` (access/refresh token signing)
+- `php-amqplib/php-amqplib` (RabbitMQ client)
+- Docker Compose (local environment)
+- Pest / PHPUnit
+- PHPStan via Larastan (level 7)
+- Laravel Pint
+
+## Key Engineering Decisions
+
+### Modular monolith architecture
 
 The codebase is a modular monolith: one Laravel application, several independently structured business modules under `src/Modules`, plus cross-cutting code under `src/Shared`.
 
@@ -36,7 +55,7 @@ Modules do not read another module's Eloquent models or database tables. Cross-m
 
 Cross-module facts that need to reach another module asynchronously (a captured payment, a received return) are published as integration events through a transactional outbox and consumed from RabbitMQ, rather than called synchronously in-process.
 
-## Design Patterns
+### Design patterns
 
 Patterns used as named GoF/enterprise patterns, not just "the general idea":
 
@@ -55,50 +74,19 @@ Patterns used as named GoF/enterprise patterns, not just "the general idea":
 | Specification | Return, Promotion | `WithinReturnWindowSpecification`, `DateRangeSpecification`, composed with `AndReturnEligibilitySpecification` / `AndSpecification` |
 | Composite | Promotion | `CompositeDiscount` combines multiple `IDiscountPolicy` instances |
 
-Two things that look like a pattern from the table above but are implemented more simply, on purpose:
+Three things that look like a pattern from the table above but are implemented more simply, on purpose:
 
 - **Order status, Payment status, Return status are not the GoF State pattern.** Each is a backed enum plus a guard method (`transition($expected, $target)`) on the entity that throws on an invalid move. There are no separate polymorphic state classes; a finite-state-machine guard was enough and avoids a layer of indirection nothing else needs.
 - **Checkout validation is a rule pipeline, not Chain of Responsibility.** `Modules\Order\Application\Checkout\CheckoutRulePipeline` runs a flat `iterable<ICheckoutRule>` (`OrderNotEmptyRule`, `CustomerCanOrderRule`, `InventoryAvailableRule`, `ApplyPromotionsRule`, `CalculateShippingRule`). Each rule is independent; none of them decide whether to invoke the next one, so there is no actual chain.
 - **There is no in-process Observer/domain-event dispatcher.** Nothing in `src` uses Laravel's `Event`/listener system. Every reaction to a business fact crosses module boundaries through the outbox → RabbitMQ → consumer path described above, which is publish/subscribe at the process boundary, not the classic Subject/Observer pattern.
 
-## Notable Implementation Details
+### Notable implementation details
 
 - **Idempotency**: payment requests take a client-supplied `Idempotency-Key` header; retrying it returns the original payment instead of creating a second one. Refunds are keyed by `refund_id` end-to-end, and `processed_messages` (consumer, message_id) makes RabbitMQ message handling idempotent independent of retries or redelivery.
 - **Outbox delivery**: `outbox_messages` rows are claimed with `FOR UPDATE SKIP LOCKED` (PostgreSQL) so multiple publisher processes never double-publish the same row; a claim carries a token and an expiry, and an unpublished claim is recovered automatically after it times out.
 - **Concurrency in Inventory**: reservations lock the relevant inventory rows in ascending ID order inside one transaction, which is what prevents deadlocks under concurrent reservations and is verified by an integration test that runs competing PostgreSQL connections against the same stock.
 - **Correlation propagation**: `X-Request-ID`/`X-Correlation-ID` flow from the HTTP middleware through the command bus's log context, into the outbox row, onto the RabbitMQ message's native `correlation_id` property, and back into the consumer's log context, without touching the business payload. Older outbox rows and messages without this metadata still decode correctly.
 - **Transaction boundaries stop at the process, not the network**: application handlers open the transaction; the actual HTTP call to a payment gateway or shipping provider always happens outside of it, so a slow or failing third party can never hold a database lock.
-
-## Modules
-
-| Module | Responsibility |
-| --- | --- |
-| Identity | User accounts, JWT access/refresh tokens, user status lifecycle. |
-| Customer | Customer profile and delivery addresses. |
-| Inventory | Stock items and reservations. |
-| Order | Order lifecycle and checkout orchestration across Customer, Inventory, Promotion, and Shipping. |
-| Promotion | Discount codes and eligibility rules applied during checkout. |
-| Payment | Payment requests, Stripe/PayPal webhooks, refund coordination. |
-| Shipping | Shipment booking and cost calculation. |
-| Return | Return requests, eligibility, and refund coordination with Payment. |
-| Notification | Outbound email notifications triggered by domain events. |
-
-Order, Inventory, Shipping, Notification, and Promotion expose internal command/query contracts only; they have no public HTTP routes. Identity, Customer, Payment, and Return expose the HTTP API described below.
-
-## Tech Stack
-
-- PHP 8.3+ (the Docker image runs PHP 8.5)
-- Laravel 13
-- PostgreSQL (application database and integration test target)
-- SQLite in memory (default test database for unit and feature tests)
-- Redis (cache and session store)
-- RabbitMQ (integration event transport)
-- `lcobucci/jwt` (access/refresh token signing)
-- `php-amqplib/php-amqplib` (RabbitMQ client)
-- Docker Compose (local environment)
-- Pest / PHPUnit
-- PHPStan via Larastan (level 7)
-- Laravel Pint
 
 ## Project Structure
 
@@ -116,9 +104,23 @@ src/
     └── Presentation/   # cross-cutting HTTP concerns (e.g. correlation middleware)
 ```
 
-Every module under `src/Modules` follows the same four-layer split described in Architecture. `src/Shared` provides the command/query bus, the outbox, and RabbitMQ messaging infrastructure that every module builds on; it contains no business rules.
+Every module under `src/Modules` follows the same four-layer split described above. `src/Shared` provides the command/query bus, the outbox, and RabbitMQ messaging infrastructure that every module builds on; it contains no business rules.
 
-## Getting Started
+| Module | Responsibility |
+| --- | --- |
+| Identity | User accounts, JWT access/refresh tokens, user status lifecycle. |
+| Customer | Customer profile and delivery addresses. |
+| Inventory | Stock items and reservations. |
+| Order | Order lifecycle and checkout orchestration across Customer, Inventory, Promotion, and Shipping. |
+| Promotion | Discount codes and eligibility rules applied during checkout. |
+| Payment | Payment requests, Stripe/PayPal webhooks, refund coordination. |
+| Shipping | Shipment booking and cost calculation. |
+| Return | Return requests, eligibility, and refund coordination with Payment. |
+| Notification | Outbound email notifications triggered by domain events. |
+
+Order, Inventory, Shipping, Notification, and Promotion expose internal command/query contracts only; they have no public HTTP routes. Identity, Customer, Payment, and Return expose the HTTP API described below.
+
+## How to Run
 
 ### Requirements
 
@@ -133,19 +135,7 @@ docker compose build app
 docker compose run --rm app php artisan key:generate
 ```
 
-### Environment
-
-The development PostgreSQL and RabbitMQ credentials are `orderflow` / `orderflow`. Override published ports or the Docker subnet when they conflict with other local services:
-
-```bash
-APP_PORT=8080 POSTGRES_PORT=55432 ORDERFLOW_SUBNET=172.31.241.0/24 docker compose up --detach
-```
-
-### Database
-
-Migrations run automatically when the `app` container starts. The application container also creates the local JWT key pair when it is missing.
-
-### Running the Application
+### Starting the stack
 
 ```bash
 docker compose up --detach
@@ -159,19 +149,19 @@ Local endpoints:
 - PostgreSQL: `localhost:5432`
 - Redis: `localhost:6379`
 
+Override published ports or the Docker subnet when they conflict with other local services:
+
+```bash
+APP_PORT=8080 POSTGRES_PORT=55432 ORDERFLOW_SUBNET=172.31.241.0/24 docker compose up --detach
+```
+
 Stop containers without deleting database or broker data:
 
 ```bash
 docker compose down
 ```
 
-Generate a new JWT key pair only when rotating local keys:
-
-```bash
-docker compose exec app php artisan identity:generate-jwt-keys --force
-```
-
-### Workers
+### Background workers
 
 Docker Compose starts one container per background responsibility:
 
@@ -187,7 +177,22 @@ Docker Compose starts one container per background responsibility:
 
 Application code dispatches integration events into a database-backed outbox inside the same transaction as the business change. The outbox publisher and the RabbitMQ consumers run in separate processes so a broker outage cannot roll back a committed transaction.
 
-## API
+## Environment Variables and Secrets
+
+Docker Compose fills in local defaults for the database, broker, and JWT keys automatically, so a fresh clone needs no manual secret setup to run `docker compose up`. The variables below only matter once you go beyond the default local stack:
+
+| Variable | Purpose | Where to get it |
+| --- | --- | --- |
+| `APP_KEY` | Laravel application encryption key | Generated locally by `php artisan key:generate`, no external source |
+| `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH` | Custom RSA key pair for signing access/refresh tokens | Optional; the `app` container generates a local pair automatically if unset |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Stripe payment processing and webhook signature verification | Stripe Dashboard → Developers → API keys / Webhooks |
+| `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` / `PAYPAL_WEBHOOK_ID` | PayPal payment processing and webhook verification | PayPal Developer Dashboard → your app's credentials |
+| `RABBITMQ_USER` / `RABBITMQ_PASSWORD` | RabbitMQ broker credentials | Defaults to `orderflow` / `orderflow` in Docker Compose; set explicitly when pointing at an external broker |
+| `DB_HOST` / `DB_PORT` / `DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD` | PostgreSQL connection, when not using the bundled `postgres` service | Your PostgreSQL instance |
+
+See `.env.example` for the full list of tunables (timeouts, batch sizes, queue names); those have working defaults and rarely need to change for local development.
+
+## API Documentation
 
 The HTTP API is versioned under `/api/v1`. Authenticated routes require `Authorization: Bearer <access_token>`.
 
@@ -215,11 +220,60 @@ The HTTP API is versioned under `/api/v1`. Authenticated routes require `Authori
 | POST | `/api/v1/returns` | Return | Bearer |
 | GET | `/api/v1/returns/{returnId}` | Return | Bearer |
 
-The full request/response contract, including validation rules, error codes, and headers, is in [`openapi.yaml`](openapi.yaml). A Russian translation of this README is available in [`README.ru.md`](README.ru.md).
+The full request/response contract, including validation rules, error codes, and headers, is in [`openapi.yaml`](openapi.yaml).
 
 Every response carries `X-Request-ID` and `X-Correlation-ID` headers. Supplying a valid UUID in the request headers of the same names preserves it; otherwise the server generates one.
 
-## Testing
+### Example requests
+
+Register a user (created in `pending` status, no token pair returned):
+
+```bash
+curl -X POST http://localhost:8000/api/v1/identity/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email": "jane@example.com", "password": "Str0ng!Passw0rd123"}'
+```
+
+Log in to get an access/refresh token pair:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/identity/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "jane@example.com", "password": "Str0ng!Passw0rd123"}'
+```
+
+```json
+{
+  "data": {
+    "access_token": "eyJhbGciOi...",
+    "refresh_token": "eyJhbGciOi...",
+    "token_type": "Bearer",
+    "access_expires_at": "2026-10-01T12:15:00Z",
+    "refresh_expires_at": "2026-10-31T12:00:00Z"
+  }
+}
+```
+
+Call an authenticated endpoint with the access token:
+
+```bash
+curl http://localhost:8000/api/v1/customers/profile \
+  -H "Authorization: Bearer eyJhbGciOi..."
+```
+
+## Database Migrations
+
+Migrations live in `database/migrations`. The `app` container runs `php artisan migrate --force` automatically on startup, so a fresh `docker compose up` always has an up-to-date schema.
+
+To create or apply migrations manually:
+
+```bash
+docker compose exec app php artisan make:migration create_something_table
+docker compose exec app php artisan migrate
+docker compose exec app php artisan migrate:rollback
+```
+
+## Tests
 
 ```bash
 docker compose exec app php artisan test --compact
@@ -228,28 +282,19 @@ docker compose exec app composer test:integration
 
 Unit, feature, and architecture tests run against an in-memory SQLite database. The integration suite runs against the dedicated `orderflow_test` PostgreSQL database and a real RabbitMQ instance; it verifies PostgreSQL-specific behavior such as row locking under concurrent access and end-to-end message delivery. It requires `RABBITMQ_USER=orderflow` and `RABBITMQ_PASSWORD=orderflow` in the environment.
 
-## Static Analysis
+## Code Quality
 
 ```bash
 docker compose exec app composer analyse
-```
-
-PHPStan (via Larastan) runs at level 7 against `app`, `bootstrap`, `config`, `database`, and `src`.
-
-## Code Style
-
-```bash
 docker compose exec app vendor/bin/pint --format agent
 docker compose exec app composer validate --strict
 ```
 
-## Development
-
-CI (`.github/workflows/ci.yml`) runs Composer validation, Pint, static analysis, the SQLite test suite, and the PostgreSQL integration suite on every push and pull request.
+PHPStan (via Larastan) runs at level 7 against `app`, `bootstrap`, `config`, `database`, and `src`. CI (`.github/workflows/ci.yml`) runs Composer validation, Pint, static analysis, the SQLite test suite, and the PostgreSQL integration suite on every push and pull request.
 
 Command and query handlers run through shared buses (`ICommandBus`, `IQueryBus`). The bus does not open database transactions; transaction boundaries stay explicit inside application handlers so an external HTTP call (a payment gateway, a shipping provider) is never made inside an open transaction.
 
-## Roadmap
+## Limitations
 
 Metrics and distributed tracing are not implemented. Structured logging and request/correlation ID propagation are in place; adding metrics would require agreeing on an exporter and backend first.
 
